@@ -1,13 +1,13 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../context/AuthContext';
 
 // ============================================================================
-// APP CONTEXT - Shared state for the entire app
+// FINANCE APP CONTEXT - Finance data & operations
 // ============================================================================
 
 const AppContext = createContext({});
 
-// Default categories/accounts for new users
 const DEFAULT_ACCOUNTS = [
   { name: 'Ricky', bank: 'CBC', color: '#00A3E0', is_default: true, sort_order: 1 },
   { name: 'Commun', bank: 'CBC', color: '#E67E22', is_default: false, sort_order: 2 },
@@ -149,59 +149,17 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export function AppProvider({ children }) {
-  // Auth state
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  
-  // Language
-  const [language, setLanguage] = useState('fr');
-  
-  // Data
+  const auth = useAuth();
+  const { user } = auth;
+
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [recurringTemplates, setRecurringTemplates] = useState([]);
-  
-  // Loading states
   const [dataLoading, setDataLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
-
-  // ============================================================================
-  // AUTH
-  // ============================================================================
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const signIn = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
-  };
-
-  const signUp = async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setAccounts([]);
-    setCategories([]);
-    setSubcategories([]);
-    setTransactions([]);
-    setBudgets([]);
-  };
 
   // ============================================================================
   // DATA FETCHING
@@ -209,13 +167,19 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (user) {
       initializeData();
+    } else {
+      setAccounts([]);
+      setCategories([]);
+      setSubcategories([]);
+      setTransactions([]);
+      setBudgets([]);
+      setRecurringTemplates([]);
     }
   }, [user]);
 
   const initializeData = async () => {
     setDataLoading(true);
-    
-    // Check if user has categories (first time setup)
+
     const { data: existingCats } = await supabase
       .from('categories')
       .select('id')
@@ -233,15 +197,13 @@ export function AppProvider({ children }) {
 
   const createDefaultData = async () => {
     try {
-      // Create accounts
       await supabase
         .from('accounts')
         .insert(DEFAULT_ACCOUNTS.map(a => ({ ...a, user_id: user.id })));
 
-      // Create categories and subcategories
       for (const cat of DEFAULT_CATEGORIES) {
         const { subcategories: subs, ...categoryData } = cat;
-        
+
         const { data: newCat } = await supabase
           .from('categories')
           .insert({ ...categoryData, user_id: user.id, is_default: true })
@@ -265,8 +227,6 @@ export function AppProvider({ children }) {
   };
 
   const fetchAllData = async () => {
-    console.log('Fetching all data...');
-    
     const [accRes, catRes, subRes, budRes, recRes] = await Promise.all([
       supabase.from('accounts').select('*').order('sort_order'),
       supabase.from('categories').select('*').order('sort_order'),
@@ -275,7 +235,6 @@ export function AppProvider({ children }) {
       supabase.from('recurring_templates').select('*').eq('is_active', true),
     ]);
 
-    // Fetch ALL transactions with pagination (Supabase max 1000 per request)
     let allTransactions = [];
     let page = 0;
     const pageSize = 1000;
@@ -288,23 +247,17 @@ export function AppProvider({ children }) {
         .order('date', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (error) {
-        console.error('Error fetching transactions:', error);
-        break;
-      }
+      if (error) { console.error('Error fetching transactions:', error); break; }
 
       if (data && data.length > 0) {
         allTransactions = [...allTransactions, ...data];
-        console.log(`Fetched page ${page + 1}: ${data.length} transactions (total: ${allTransactions.length})`);
         page++;
-        hasMore = data.length === pageSize; // If we got full page, there might be more
+        hasMore = data.length === pageSize;
       } else {
         hasMore = false;
       }
     }
 
-    console.log('Total transactions fetched:', allTransactions.length);
-    
     setAccounts(accRes.data || []);
     setCategories(catRes.data || []);
     setSubcategories(subRes.data || []);
@@ -317,41 +270,20 @@ export function AppProvider({ children }) {
   // TRANSACTION CRUD
   // ============================================================================
   const addTransaction = async (transaction) => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert({ ...transaction, user_id: user.id })
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setTransactions(prev => [data, ...prev]);
-    }
+    const { data, error } = await supabase.from('transactions').insert({ ...transaction, user_id: user.id }).select().single();
+    if (!error && data) setTransactions(prev => [data, ...prev]);
     return { data, error };
   };
 
   const updateTransaction = async (id, updates) => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setTransactions(prev => prev.map(t => t.id === id ? data : t));
-    }
+    const { data, error } = await supabase.from('transactions').update(updates).eq('id', id).select().single();
+    if (!error && data) setTransactions(prev => prev.map(t => t.id === id ? data : t));
     return { data, error };
   };
 
   const deleteTransaction = async (id) => {
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', id);
-    
-    if (!error) {
-      setTransactions(prev => prev.filter(t => t.id !== id));
-    }
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (!error) setTransactions(prev => prev.filter(t => t.id !== id));
     return { error };
   };
 
@@ -359,41 +291,20 @@ export function AppProvider({ children }) {
   // ACCOUNT CRUD
   // ============================================================================
   const addAccount = async (account) => {
-    const { data, error } = await supabase
-      .from('accounts')
-      .insert({ ...account, user_id: user.id })
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setAccounts(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
-    }
+    const { data, error } = await supabase.from('accounts').insert({ ...account, user_id: user.id }).select().single();
+    if (!error && data) setAccounts(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
     return { data, error };
   };
 
   const updateAccount = async (id, updates) => {
-    const { data, error } = await supabase
-      .from('accounts')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setAccounts(prev => prev.map(a => a.id === id ? data : a).sort((a, b) => a.sort_order - b.sort_order));
-    }
+    const { data, error } = await supabase.from('accounts').update(updates).eq('id', id).select().single();
+    if (!error && data) setAccounts(prev => prev.map(a => a.id === id ? data : a).sort((a, b) => a.sort_order - b.sort_order));
     return { data, error };
   };
 
   const deleteAccount = async (id) => {
-    const { error } = await supabase
-      .from('accounts')
-      .delete()
-      .eq('id', id);
-    
-    if (!error) {
-      setAccounts(prev => prev.filter(a => a.id !== id));
-    }
+    const { error } = await supabase.from('accounts').delete().eq('id', id);
+    if (!error) setAccounts(prev => prev.filter(a => a.id !== id));
     return { error };
   };
 
@@ -401,41 +312,21 @@ export function AppProvider({ children }) {
   // CATEGORY CRUD
   // ============================================================================
   const addCategory = async (category) => {
-    const { data, error } = await supabase
-      .from('categories')
-      .insert({ ...category, user_id: user.id })
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setCategories(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
-    }
+    const { data, error } = await supabase.from('categories').insert({ ...category, user_id: user.id }).select().single();
+    if (!error && data) setCategories(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
     return { data, error };
   };
 
   const updateCategory = async (id, updates) => {
-    const { data, error } = await supabase
-      .from('categories')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setCategories(prev => prev.map(c => c.id === id ? data : c).sort((a, b) => a.sort_order - b.sort_order));
-    }
+    const { data, error } = await supabase.from('categories').update(updates).eq('id', id).select().single();
+    if (!error && data) setCategories(prev => prev.map(c => c.id === id ? data : c).sort((a, b) => a.sort_order - b.sort_order));
     return { data, error };
   };
 
   const deleteCategory = async (id) => {
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from('categories').delete().eq('id', id);
     if (!error) {
       setCategories(prev => prev.filter(c => c.id !== id));
-      // Also remove subcategories of this category from local state
       setSubcategories(prev => prev.filter(s => s.category_id !== id));
     }
     return { error };
@@ -445,41 +336,20 @@ export function AppProvider({ children }) {
   // SUBCATEGORY CRUD
   // ============================================================================
   const addSubcategory = async (subcategory) => {
-    const { data, error } = await supabase
-      .from('subcategories')
-      .insert({ ...subcategory, user_id: user.id })
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setSubcategories(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
-    }
+    const { data, error } = await supabase.from('subcategories').insert({ ...subcategory, user_id: user.id }).select().single();
+    if (!error && data) setSubcategories(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
     return { data, error };
   };
 
   const updateSubcategory = async (id, updates) => {
-    const { data, error } = await supabase
-      .from('subcategories')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setSubcategories(prev => prev.map(s => s.id === id ? data : s).sort((a, b) => a.sort_order - b.sort_order));
-    }
+    const { data, error } = await supabase.from('subcategories').update(updates).eq('id', id).select().single();
+    if (!error && data) setSubcategories(prev => prev.map(s => s.id === id ? data : s).sort((a, b) => a.sort_order - b.sort_order));
     return { data, error };
   };
 
   const deleteSubcategory = async (id) => {
-    const { error } = await supabase
-      .from('subcategories')
-      .delete()
-      .eq('id', id);
-    
-    if (!error) {
-      setSubcategories(prev => prev.filter(s => s.id !== id));
-    }
+    const { error } = await supabase.from('subcategories').delete().eq('id', id);
+    if (!error) setSubcategories(prev => prev.filter(s => s.id !== id));
     return { error };
   };
 
@@ -487,41 +357,20 @@ export function AppProvider({ children }) {
   // RECURRING TEMPLATE CRUD
   // ============================================================================
   const addRecurringTemplate = async (template) => {
-    const { data, error } = await supabase
-      .from('recurring_templates')
-      .insert({ ...template, user_id: user.id })
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setRecurringTemplates(prev => [...prev, data]);
-    }
+    const { data, error } = await supabase.from('recurring_templates').insert({ ...template, user_id: user.id }).select().single();
+    if (!error && data) setRecurringTemplates(prev => [...prev, data]);
     return { data, error };
   };
 
   const updateRecurringTemplate = async (id, updates) => {
-    const { data, error } = await supabase
-      .from('recurring_templates')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (!error && data) {
-      setRecurringTemplates(prev => prev.map(t => t.id === id ? data : t));
-    }
+    const { data, error } = await supabase.from('recurring_templates').update(updates).eq('id', id).select().single();
+    if (!error && data) setRecurringTemplates(prev => prev.map(t => t.id === id ? data : t));
     return { data, error };
   };
 
   const deleteRecurringTemplate = async (id) => {
-    const { error } = await supabase
-      .from('recurring_templates')
-      .delete()
-      .eq('id', id);
-    
-    if (!error) {
-      setRecurringTemplates(prev => prev.filter(t => t.id !== id));
-    }
+    const { error } = await supabase.from('recurring_templates').delete().eq('id', id);
+    if (!error) setRecurringTemplates(prev => prev.filter(t => t.id !== id));
     return { error };
   };
 
@@ -529,53 +378,22 @@ export function AppProvider({ children }) {
   // BUDGET CRUD
   // ============================================================================
   const addBudget = async (budget, categoryIds = [], subcategoryIds = []) => {
-    const { data, error } = await supabase
-      .from('budgets')
-      .insert({ ...budget, user_id: user.id })
-      .select()
-      .single();
-    
+    const { data, error } = await supabase.from('budgets').insert({ ...budget, user_id: user.id }).select().single();
     if (!error && data) {
-      // Add category links
-      if (categoryIds.length > 0) {
-        await supabase.from('budget_categories').insert(
-          categoryIds.map(cid => ({ budget_id: data.id, category_id: cid }))
-        );
-      }
-      // Add subcategory links
-      if (subcategoryIds.length > 0) {
-        await supabase.from('budget_subcategories').insert(
-          subcategoryIds.map(sid => ({ budget_id: data.id, subcategory_id: sid }))
-        );
-      }
-      await fetchAllData(); // Refresh to get linked data
+      if (categoryIds.length > 0) await supabase.from('budget_categories').insert(categoryIds.map(cid => ({ budget_id: data.id, category_id: cid })));
+      if (subcategoryIds.length > 0) await supabase.from('budget_subcategories').insert(subcategoryIds.map(sid => ({ budget_id: data.id, subcategory_id: sid })));
+      await fetchAllData();
     }
     return { data, error };
   };
 
   const updateBudget = async (id, updates, categoryIds, subcategoryIds) => {
-    const { data, error } = await supabase
-      .from('budgets')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
+    const { data, error } = await supabase.from('budgets').update(updates).eq('id', id).select().single();
     if (!error && data) {
-      // Update category links
       await supabase.from('budget_categories').delete().eq('budget_id', id);
       await supabase.from('budget_subcategories').delete().eq('budget_id', id);
-      
-      if (categoryIds?.length > 0) {
-        await supabase.from('budget_categories').insert(
-          categoryIds.map(cid => ({ budget_id: id, category_id: cid }))
-        );
-      }
-      if (subcategoryIds?.length > 0) {
-        await supabase.from('budget_subcategories').insert(
-          subcategoryIds.map(sid => ({ budget_id: id, subcategory_id: sid }))
-        );
-      }
+      if (categoryIds?.length > 0) await supabase.from('budget_categories').insert(categoryIds.map(cid => ({ budget_id: id, category_id: cid })));
+      if (subcategoryIds?.length > 0) await supabase.from('budget_subcategories').insert(subcategoryIds.map(sid => ({ budget_id: id, subcategory_id: sid })));
       await fetchAllData();
     }
     return { data, error };
@@ -583,121 +401,44 @@ export function AppProvider({ children }) {
 
   const deleteBudget = async (id) => {
     const { error } = await supabase.from('budgets').delete().eq('id', id);
-    if (!error) {
-      setBudgets(prev => prev.filter(b => b.id !== id));
-    }
+    if (!error) setBudgets(prev => prev.filter(b => b.id !== id));
     return { error };
   };
 
   // ============================================================================
   // HELPERS
   // ============================================================================
-  const t = (fr, en) => language === 'fr' ? fr : en;
-  
-  const toggleLanguage = () => setLanguage(prev => prev === 'fr' ? 'en' : 'fr');
-
-  const formatAmount = (amount) => {
-    return new Intl.NumberFormat(language === 'fr' ? 'fr-BE' : 'en-GB', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(language === 'fr' ? 'fr-BE' : 'en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
+  const formatAmount = (amount) => new Intl.NumberFormat(auth.language === 'fr' ? 'fr-BE' : 'en-GB', { style: 'currency', currency: 'EUR' }).format(amount);
+  const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString(auth.language === 'fr' ? 'fr-BE' : 'en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const getSubcategory = (id) => subcategories.find(s => s.id === id);
   const getCategory = (id) => categories.find(c => c.id === id);
   const getAccount = (id) => accounts.find(a => a.id === id);
-
-  const getCategoryForSubcategory = (subcategoryId) => {
-    const sub = getSubcategory(subcategoryId);
-    return sub ? getCategory(sub.category_id) : null;
-  };
+  const getCategoryForSubcategory = (subcategoryId) => { const sub = getSubcategory(subcategoryId); return sub ? getCategory(sub.category_id) : null; };
 
   // ============================================================================
-  // CONTEXT VALUE
+  // CONTEXT VALUE - auth + finance data merged
   // ============================================================================
   const value = {
-    // Auth
-    user,
-    authLoading,
-    signIn,
-    signUp,
-    signOut,
-    
-    // Language
-    language,
-    toggleLanguage,
-    t,
-    
-    // Data
-    accounts,
-    categories,
-    subcategories,
-    transactions,
-    budgets,
-    recurringTemplates,
-    
-    // Loading
-    dataLoading,
-    setupLoading,
-    
-    // Transaction CRUD
-    addTransaction,
-    updateTransaction,
-    deleteTransaction,
-    
-    // Account CRUD
-    addAccount,
-    updateAccount,
-    deleteAccount,
-    
-    // Category CRUD
-    addCategory,
-    updateCategory,
-    deleteCategory,
-    
-    // Subcategory CRUD
-    addSubcategory,
-    updateSubcategory,
-    deleteSubcategory,
-    
-    // Recurring Template CRUD
-    addRecurringTemplate,
-    updateRecurringTemplate,
-    deleteRecurringTemplate,
-    
-    // Budget CRUD
-    addBudget,
-    updateBudget,
-    deleteBudget,
+    ...auth,
+    accounts, categories, subcategories, transactions, budgets, recurringTemplates,
+    dataLoading, setupLoading,
+    addTransaction, updateTransaction, deleteTransaction,
+    addAccount, updateAccount, deleteAccount,
+    addCategory, updateCategory, deleteCategory,
+    addSubcategory, updateSubcategory, deleteSubcategory,
+    addRecurringTemplate, updateRecurringTemplate, deleteRecurringTemplate,
+    addBudget, updateBudget, deleteBudget,
     fetchAllData,
-    
-    // Helpers
-    formatAmount,
-    formatDate,
-    getSubcategory,
-    getCategory,
-    getAccount,
-    getCategoryForSubcategory,
+    formatAmount, formatDate,
+    getSubcategory, getCategory, getAccount, getCategoryForSubcategory,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-// Custom hook to use the context
 export function useApp() {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
+  if (!context) throw new Error('useApp must be used within an AppProvider');
   return context;
 }
 

@@ -4,25 +4,30 @@ import { useApp } from '../../context/AppContext';
 // HEADER - Top bar with logo, language toggle, sign out
 // ============================================================================
 
-export default function Header({ onSettingsClick }) {
+export default function Header({ onSettingsClick, onHomeClick }) {
   const { user, language, toggleLanguage, signOut, t } = useApp();
 
   return (
     <header style={styles.header}>
       <div style={styles.logo}>
+        {onHomeClick && (
+          <button onClick={onHomeClick} style={styles.homeBtn} title={t('Accueil', 'Home')}>
+            🏠
+          </button>
+        )}
         <span style={styles.logoIcon}>💰</span>
         <span style={styles.logoText}>MyFinance</span>
       </div>
-      
+
       <div style={styles.actions}>
         <button onClick={toggleLanguage} style={styles.langBtn}>
           {language === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}
         </button>
-        
+
         <button onClick={onSettingsClick} style={styles.actionBtn} title={t('Paramètres', 'Settings')}>
           ⚙️
         </button>
-        
+
         <button onClick={signOut} style={styles.signOutBtn} title={t('Se déconnecter', 'Sign out')}>
           🚪
         </button>
@@ -48,6 +53,19 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+  },
+  homeBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    border: '1px solid #E1E8ED',
+    borderRadius: '8px',
+    background: 'white',
+    fontSize: '16px',
+    cursor: 'pointer',
+    padding: 0,
   },
   logoIcon: {
     fontSize: '24px',

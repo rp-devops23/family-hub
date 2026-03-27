@@ -288,7 +288,7 @@ export default function ImportPage({ onClose }) {
     setImporting(true);
     setStep(4);
     
-    const { supabase } = await import('../lib/supabase');
+    const { supabase } = await import('../../../lib/supabase');
     
     const batchSize = 50;
     let imported = 0;
