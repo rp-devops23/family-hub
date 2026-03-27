@@ -7,8 +7,15 @@ import { supabase } from '../../../lib/supabase'
 // ============================================
 
 export async function getProfile(userId) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
-  if (error && error.code !== 'PGRST116') throw error
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+  if (error) throw error
+  if (!data) {
+    // First login — create profile row
+    const { data: created, error: createError } = await supabase
+      .from('profiles').insert({ id: userId, language: 'fr' }).select().maybeSingle()
+    if (createError) throw createError
+    return created
+  }
   return data
 }
 

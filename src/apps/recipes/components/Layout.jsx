@@ -1,5 +1,4 @@
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing } from '../lib/theme'
 import RecipesPage from './RecipesPage'
 import CalendarPage from './CalendarPage'
 import ShoppingListPage from './ShoppingListPage'
@@ -29,69 +28,78 @@ export default function Layout({ onHome }) {
 
   return (
     <div style={styles.container}>
-      {/* Hub back button */}
       {onHome && (
         <div style={styles.hubBar}>
-          <button onClick={onHome} style={styles.hubBtn}>🏠 {t('nav.recipes') === 'Recettes' ? 'Accueil' : 'Home'}</button>
+          <button onClick={onHome} style={styles.hubBtn}>
+            ← {t('nav.recipes') === 'Recettes' ? 'Accueil' : 'Home'}
+          </button>
         </div>
       )}
 
-      <main style={{ ...styles.main, paddingTop: onHome ? '36px' : '0' }}>
+      <main style={{ ...styles.main, paddingTop: onHome ? '44px' : '0' }}>
         {renderPage()}
       </main>
 
       <nav style={styles.nav}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setCurrentTab(tab.id)}
-            style={{ ...styles.navButton, color: currentTab === tab.id ? colors.forest : colors.textMuted }}
-          >
-            <span style={styles.navIcon}>
-              {tab.icon}
-              {tab.badge > 0 && (
-                <span style={styles.navBadge}>{tab.badge > 9 ? '9+' : tab.badge}</span>
-              )}
-            </span>
-            <span style={{ ...styles.navLabel, fontWeight: currentTab === tab.id ? 600 : 400 }}>
-              {tab.label}
-            </span>
-          </button>
-        ))}
+        {tabs.map(tab => {
+          const isActive = currentTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setCurrentTab(tab.id)}
+              style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
+            >
+              <span style={{ ...styles.icon, opacity: isActive ? 1 : 0.5, transform: isActive ? 'scale(1.1)' : 'scale(1)' }}>
+                {tab.icon}
+                {tab.badge > 0 && <span style={styles.badge}>{tab.badge > 9 ? '9+' : tab.badge}</span>}
+              </span>
+              <span style={{ ...styles.label, color: isActive ? '#00A3E0' : '#636E72', fontWeight: isActive ? 600 : 400 }}>
+                {tab.label}
+              </span>
+            </button>
+          )
+        })}
       </nav>
     </div>
   )
 }
 
 const styles = {
-  container: { minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: colors.cream },
+  container: {
+    minHeight: '100vh', display: 'flex', flexDirection: 'column',
+    backgroundColor: '#F5F7FA',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  },
   hubBar: {
-    position: 'fixed', top: 0, left: 0, right: 0, height: '36px',
-    backgroundColor: colors.forest, display: 'flex', alignItems: 'center',
-    paddingLeft: '12px', zIndex: 200
+    position: 'fixed', top: 0, left: 0, right: 0, height: '44px',
+    backgroundColor: 'white', borderBottom: '1px solid #E1E8ED',
+    display: 'flex', alignItems: 'center', paddingLeft: '16px', zIndex: 200
   },
   hubBtn: {
-    background: 'none', border: 'none', color: 'white', fontSize: '13px',
-    fontWeight: 600, cursor: 'pointer', fontFamily: fonts.body, padding: 0
+    background: 'none', border: 'none', color: '#00A3E0', fontSize: '14px',
+    fontWeight: 600, cursor: 'pointer',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   },
   main: { flex: 1, paddingBottom: '80px', overflowY: 'auto' },
   nav: {
     position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px',
-    backgroundColor: colors.white, borderTop: `1px solid ${colors.warmGray}`,
+    backgroundColor: 'white', borderTop: '1px solid #E1E8ED',
     display: 'flex', justifyContent: 'space-around', alignItems: 'center',
     paddingBottom: 'env(safe-area-inset-bottom)', zIndex: 100
   },
-  navButton: {
+  tab: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', gap: '4px', padding: spacing.sm,
-    border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontFamily: fonts.body
+    justifyContent: 'center', gap: '4px', padding: '8px 12px',
+    border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
+    borderRadius: '8px', transition: 'background-color 0.2s'
   },
-  navIcon: { fontSize: '20px', position: 'relative' },
-  navBadge: {
+  tabActive: { backgroundColor: '#F0F9FF' },
+  icon: { fontSize: '20px', position: 'relative', transition: 'all 0.2s' },
+  badge: {
     position: 'absolute', top: '-6px', right: '-10px',
-    backgroundColor: colors.terracotta, color: colors.white,
+    backgroundColor: '#E74C3C', color: 'white',
     fontSize: '10px', fontWeight: 700, padding: '2px 5px', borderRadius: '10px',
     minWidth: '16px', textAlign: 'center'
   },
-  navLabel: { fontSize: fontSizes.xs }
+  label: { fontSize: '11px', transition: 'color 0.2s' }
 }
