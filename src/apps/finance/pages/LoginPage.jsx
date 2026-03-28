@@ -43,9 +43,9 @@ export default function LoginPage() {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.logoSection}>
-          <span style={styles.logoIcon}>💰</span>
-          <h1 style={styles.title}>MyFinance</h1>
-          <p style={styles.subtitle}>Gérez vos finances personnelles</p>
+          <img src="/icons/icon.svg" alt="Family Hub" style={styles.logoImg} />
+          <h1 style={styles.title}>Family Hub</h1>
+          <p style={styles.subtitle}>Finances & Recettes</p>
         </div>
 
         <form onSubmit={handleSignIn} style={styles.form}>
@@ -123,10 +123,12 @@ const styles = {
     textAlign: 'center',
     marginBottom: '32px',
   },
-  logoIcon: {
-    fontSize: '48px',
+  logoImg: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '20px',
     display: 'block',
-    marginBottom: '12px',
+    margin: '0 auto 12px',
   },
   title: {
     margin: 0,

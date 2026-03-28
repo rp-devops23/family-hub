@@ -2,21 +2,26 @@
   <!-- Background -->
   <rect width="512" height="512" rx="112" fill="#00A3E0"/>
 
-  <!-- House shape -->
-  <path d="M256 110 L390 230 L390 400 L122 400 L122 230 Z" fill="white" opacity="0.15"/>
   <!-- Roof -->
-  <path d="M100 248 L256 108 L412 248" stroke="white" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M96 252 L256 104 L416 252" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
   <!-- House body -->
-  <rect x="148" y="248" width="216" height="152" rx="8" fill="white" opacity="0.95"/>
+  <rect x="144" y="252" width="224" height="160" rx="10" fill="white"/>
 
   <!-- Door -->
-  <rect x="224" y="316" width="64" height="84" rx="8" fill="#00A3E0"/>
+  <rect x="220" y="320" width="72" height="92" rx="8" fill="#00A3E0"/>
 
-  <!-- Left window — coin / finance -->
-  <rect x="164" y="272" width="52" height="44" rx="6" fill="#00A3E0" opacity="0.85"/>
-  <text x="190" y="301" text-anchor="middle" font-size="26" font-family="system-ui">💰</text>
+  <!-- Left window — € sign -->
+  <rect x="158" y="270" width="60" height="52" rx="6" fill="#E8F6FD"/>
+  <text x="188" y="306" text-anchor="middle" font-size="34" font-weight="700" font-family="Arial, sans-serif" fill="#00A3E0">€</text>
 
-  <!-- Right window — fork / recipes -->
-  <rect x="296" y="272" width="52" height="44" rx="6" fill="#00A3E0" opacity="0.85"/>
-  <text x="322" y="301" text-anchor="middle" font-size="26" font-family="system-ui">🍽️</text>
+  <!-- Right window — fork shape -->
+  <rect x="294" y="270" width="60" height="52" rx="6" fill="#E8F6FD"/>
+  <!-- Fork handle -->
+  <rect x="318" y="280" width="6" height="34" rx="3" fill="#00A3E0"/>
+  <!-- Fork tines -->
+  <rect x="310" y="280" width="4" height="18" rx="2" fill="#00A3E0"/>
+  <rect x="326" y="280" width="4" height="18" rx="2" fill="#00A3E0"/>
+  <!-- Fork tine base -->
+  <path d="M310 296 Q312 304 318 306 Q324 304 326 296" stroke="#00A3E0" stroke-width="2.5" fill="none"/>
 </svg>
