@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
+import { colors } from '../lib/theme'
 import ShoppingListGenerator from './ShoppingListGenerator'
 
+const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+
+function getItemName(item, language) {
+  if (item.ingredient) {
+    return language === 'fr'
+      ? item.ingredient.name_fr || item.ingredient.name_en
+      : item.ingredient.name_en || item.ingredient.name_fr
+  }
+  return item.name || item.custom_name || '?'
+}
+
 export default function ShoppingListPage() {
-  const {
-    t, language,
-    shoppingItems,
-    createShoppingItem, updateShoppingItem, deleteShoppingItem,
-    recipes
-  } = useApp()
+  const { t, language, shoppingItems, createShoppingItem, updateShoppingItem, deleteShoppingItem, recipes } = useApp()
 
   const [showGenerator, setShowGenerator] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -20,22 +26,25 @@ export default function ShoppingListPage() {
   const uncheckedItems = shoppingItems.filter(item => !item.checked)
   const checkedItems = shoppingItems.filter(item => item.checked)
 
-  // Get ingredient names for suggestions
   const getAvailableIngredients = () => {
     const used = new Set(uncheckedItems.map(item => item.ingredient_id).filter(Boolean))
     return recipes
       .flatMap(r => r.recipe_ingredients || [])
-      .map(ri => ({ id: ri.ingredient_id, name: ri.name_en }))
-      .filter(ing => ing.id && !used.has(ing.id))
+      .map(ri => ({
+        id: ri.ingredient_id,
+        name: language === 'fr'
+          ? ri.ingredient?.name_fr || ri.ingredient?.name_en
+          : ri.ingredient?.name_en || ri.ingredient?.name_fr
+      }))
+      .filter(ing => ing.id && ing.name && !used.has(ing.id))
       .filter((ing, idx, arr) => arr.findIndex(i => i.id === ing.id) === idx)
   }
 
   useEffect(() => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      const available = getAvailableIngredients()
       setSuggestions(
-        available
+        getAvailableIngredients()
           .filter(ing => ing.name.toLowerCase().includes(query))
           .slice(0, 5)
       )
@@ -48,515 +57,235 @@ export default function ShoppingListPage() {
   const handleAddCustomItem = async () => {
     const input = customInput.trim()
     if (!input) return
-
     try {
-      await createShoppingItem({
-        name: input,
-        quantity: null,
-        unit: null
-      })
+      await createShoppingItem({ name: input, quantity: null, unit: null })
       setCustomInput('')
-      // Show brief notification
-      showNotification(language === 'fr' ? 'Article ajouté' : 'Item added')
-    } catch (error) {
-      console.error('Add item error:', error)
-    }
+    } catch (error) { console.error('Add item error:', error) }
   }
 
   const handleAddIngredient = async (suggestion) => {
     try {
-      await createShoppingItem({
-        ingredient_id: suggestion.id,
-        quantity: null,
-        unit: null,
-        name: suggestion.name
-      })
+      await createShoppingItem({ ingredient_id: suggestion.id, name: suggestion.name, quantity: null, unit: null })
       setSearchQuery('')
       setShowSuggestions(false)
-      showNotification(language === 'fr' ? 'Ingrédient ajouté' : 'Ingredient added')
-    } catch (error) {
-      console.error('Add ingredient error:', error)
-    }
-  }
-
-  const showNotification = (message) => {
-    // Could implement a toast/notification system here
-    console.log(message)
+    } catch (error) { console.error('Add ingredient error:', error) }
   }
 
   const handleToggleItem = async (item) => {
-    try {
-      await updateShoppingItem(item.id, { checked: !item.checked })
-    } catch (error) {
-      console.error('Update error:', error)
-    }
+    try { await updateShoppingItem(item.id, { checked: !item.checked }) }
+    catch (error) { console.error('Update error:', error) }
   }
 
   const handleUpdateQuantity = async (itemId, quantity) => {
-    try {
-      const item = shoppingItems.find(i => i.id === itemId)
-      if (!item) return
-
-      // Parse quantity
-      let parsedQty = null
-      if (quantity && quantity.trim()) {
-        const num = parseFloat(quantity.replace(',', '.'))
-        if (!isNaN(num)) {
-          parsedQty = num.toString()
-        } else {
-          parsedQty = quantity
-        }
-      }
-
-      await updateShoppingItem(itemId, { quantity: parsedQty })
-    } catch (error) {
-      console.error('Update quantity error:', error)
-    }
+    try { await updateShoppingItem(itemId, { quantity: quantity || null }) }
+    catch (error) { console.error('Update quantity error:', error) }
   }
 
   const handleUpdateUnit = async (itemId, unit) => {
-    try {
-      await updateShoppingItem(itemId, { unit: unit || null })
-    } catch (error) {
-      console.error('Update unit error:', error)
-    }
+    try { await updateShoppingItem(itemId, { unit: unit || null }) }
+    catch (error) { console.error('Update unit error:', error) }
   }
 
   const handleDeleteItem = async (itemId) => {
-    try {
-      await deleteShoppingItem(itemId)
-    } catch (error) {
-      console.error('Delete error:', error)
-    }
+    try { await deleteShoppingItem(itemId) }
+    catch (error) { console.error('Delete error:', error) }
   }
 
   const handleClearChecked = async () => {
     if (!window.confirm(t('shopping.clearCheckedConfirm'))) return
-    try {
-      for (const item of checkedItems) {
-        await deleteShoppingItem(item.id)
-      }
-    } catch (error) {
-      console.error('Clear checked error:', error)
-    }
+    try { for (const item of checkedItems) await deleteShoppingItem(item.id) }
+    catch (error) { console.error('Clear checked error:', error) }
   }
 
   const handleClearAll = async () => {
     if (!window.confirm(t('shopping.clearAllConfirm'))) return
-    try {
-      for (const item of shoppingItems) {
-        await deleteShoppingItem(item.id)
-      }
-    } catch (error) {
-      console.error('Clear all error:', error)
-    }
-  }
-
-  const handleGenerateSuccess = (itemsProcessed) => {
-    showNotification(
-      language === 'fr'
-        ? `${itemsProcessed} article(s) ajouté(s)`
-        : `${itemsProcessed} item(s) added`
-    )
+    try { for (const item of shoppingItems) await deleteShoppingItem(item.id) }
+    catch (error) { console.error('Clear all error:', error) }
   }
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>{t('shopping.title')}</h1>
-        <p style={styles.subtitle}>{t('shopping.subtitle')}</p>
-      </header>
 
-      <div style={styles.addSection}>
-        <div style={styles.searchBox}>
+      {/* Add item row */}
+      <div style={styles.addRow}>
+        <div style={styles.searchBar}>
+          <span style={styles.searchIcon}>🔍</span>
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             placeholder={t('shopping.searchPlaceholder')}
             style={styles.searchInput}
           />
           {showSuggestions && suggestions.length > 0 && (
             <div style={styles.suggestions}>
               {suggestions.map(sugg => (
-                <button
-                  key={sugg.id}
-                  onClick={() => handleAddIngredient(sugg)}
-                  style={styles.suggestionItem}
-                >
+                <button key={sugg.id} onClick={() => handleAddIngredient(sugg)} style={styles.suggestionItem}>
                   + {sugg.name}
                 </button>
               ))}
             </div>
           )}
         </div>
+      </div>
 
-        <div style={styles.customInput}>
-          <input
-            type="text"
-            value={customInput}
-            onChange={(e) => setCustomInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleAddCustomItem()}
-            placeholder={t('shopping.customItemPlaceholder')}
-            style={styles.input}
-          />
-          <button
-            onClick={handleAddCustomItem}
-            style={styles.addButton}
-          >
-            {t('common.add')}
-          </button>
-        </div>
-
-        <button
-          onClick={() => setShowGenerator(true)}
-          style={styles.generatorButton}
-        >
-          {t('shopping.generateFromMeals')}
+      <div style={styles.customRow}>
+        <input
+          type="text"
+          value={customInput}
+          onChange={e => setCustomInput(e.target.value)}
+          onKeyPress={e => e.key === 'Enter' && handleAddCustomItem()}
+          placeholder={t('shopping.customItemPlaceholder')}
+          style={styles.customInput}
+        />
+        <button onClick={handleAddCustomItem} style={styles.addButton}>
+          {t('common.add')}
         </button>
       </div>
 
+      <button onClick={() => setShowGenerator(true)} style={styles.generatorButton}>
+        📅 {t('shopping.generateFromMeals')}
+      </button>
+
       {shoppingItems.length === 0 ? (
-        <div style={styles.emptyState}>
-          <p style={styles.emptyStateText}>{t('shopping.empty')}</p>
-          <button
-            onClick={() => setShowGenerator(true)}
-            style={styles.emptyStateButton}
-          >
-            {t('shopping.generateFromMeals')}
-          </button>
+        <div style={styles.empty}>
+          <p style={styles.emptyText}>{t('shopping.empty')}</p>
         </div>
       ) : (
         <>
-          <div style={styles.itemsSection}>
-            <div style={styles.itemsHeader}>
-              <span style={styles.itemsTitle}>
-                {t('shopping.items')} ({uncheckedItems.length})
-              </span>
+          {/* Unchecked items */}
+          <div style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <span style={styles.sectionTitle}>{t('shopping.items')} ({uncheckedItems.length})</span>
             </div>
-
-            <div style={styles.itemsList}>
+            <div style={styles.list}>
               {uncheckedItems.map(item => (
                 <div key={item.id} style={styles.item}>
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    onChange={() => handleToggleItem(item)}
-                    style={styles.checkbox}
-                  />
-
+                  <input type="checkbox" checked={false} onChange={() => handleToggleItem(item)} style={styles.checkbox} />
                   <div style={styles.itemContent}>
-                    <span style={styles.itemName}>{item.name}</span>
+                    <span style={styles.itemName}>{getItemName(item, language)}</span>
                   </div>
-
-                  <div style={styles.quantitySection}>
+                  <div style={styles.qtyRow}>
                     <input
                       type="text"
                       value={item.quantity || ''}
-                      onChange={(e) => handleUpdateQuantity(item.id, e.target.value)}
+                      onChange={e => handleUpdateQuantity(item.id, e.target.value)}
                       placeholder={t('shopping.quantity')}
-                      style={styles.quantityInput}
+                      style={styles.qtyInput}
                     />
                     <input
                       type="text"
                       value={item.unit || ''}
-                      onChange={(e) => handleUpdateUnit(item.id, e.target.value)}
+                      onChange={e => handleUpdateUnit(item.id, e.target.value)}
                       placeholder={t('shopping.unit')}
                       style={styles.unitInput}
                     />
                   </div>
-
-                  <button
-                    onClick={() => handleDeleteItem(item.id)}
-                    style={styles.deleteButton}
-                  >
-                    ×
-                  </button>
+                  <button onClick={() => handleDeleteItem(item.id)} style={styles.deleteBtn}>✕</button>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Checked items */}
           {checkedItems.length > 0 && (
-            <div style={styles.itemsSection}>
-              <div style={styles.itemsHeader}>
-                <span style={styles.itemsTitle}>
-                  {t('shopping.inCart')} ({checkedItems.length})
-                </span>
-                <button
-                  onClick={handleClearChecked}
-                  style={styles.clearButton}
-                >
-                  ✕ {t('shopping.clearChecked')}
-                </button>
+            <div style={styles.section}>
+              <div style={styles.sectionHeader}>
+                <span style={styles.sectionTitle}>{t('shopping.inCart')} ({checkedItems.length})</span>
+                <button onClick={handleClearChecked} style={styles.clearBtn}>✕ {t('shopping.clearChecked')}</button>
               </div>
-
-              <div style={styles.itemsList}>
+              <div style={styles.list}>
                 {checkedItems.map(item => (
                   <div key={item.id} style={styles.itemChecked}>
-                    <input
-                      type="checkbox"
-                      checked={item.checked}
-                      onChange={() => handleToggleItem(item)}
-                      style={styles.checkbox}
-                    />
-
-                    <div style={styles.itemContent}>
-                      <span style={styles.itemNameChecked}>{item.name}</span>
-                    </div>
-
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      style={styles.deleteButton}
-                    >
-                      ×
-                    </button>
+                    <input type="checkbox" checked={true} onChange={() => handleToggleItem(item)} style={styles.checkbox} />
+                    <span style={styles.itemNameChecked}>{getItemName(item, language)}</span>
+                    <button onClick={() => handleDeleteItem(item.id)} style={styles.deleteBtn}>✕</button>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <button
-            onClick={handleClearAll}
-            style={styles.clearAllButton}
-          >
+          <button onClick={handleClearAll} style={styles.clearAllBtn}>
             {t('shopping.clearAll')}
           </button>
         </>
       )}
 
       {showGenerator && (
-        <ShoppingListGenerator
-          onClose={() => setShowGenerator(false)}
-          onGenerated={handleGenerateSuccess}
-        />
+        <ShoppingListGenerator onClose={() => setShowGenerator(false)} onGenerated={() => {}} />
       )}
     </div>
   )
 }
 
 const styles = {
-  container: {
-    padding: spacing.md
+  container: { padding: '20px 16px 100px', fontFamily: FONT },
+  addRow: { position: 'relative', marginBottom: '8px' },
+  searchBar: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    backgroundColor: 'white', borderRadius: '10px', padding: '10px 14px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
   },
-  header: {
-    marginBottom: spacing.lg
-  },
-  title: {
-    fontFamily: fonts.heading,
-    fontSize: fontSizes['2xl'],
-    color: colors.forest,
-    margin: 0
-  },
-  subtitle: {
-    fontSize: fontSizes.sm,
-    color: colors.textMuted,
-    margin: 0,
-    marginTop: spacing.xs
-  },
-  addSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginBottom: spacing.md
-  },
-  searchBox: {
-    position: 'relative'
-  },
-  searchInput: {
-    width: '100%',
-    padding: spacing.sm,
-    fontSize: fontSizes.sm,
-    border: `1px solid ${colors.warmGray}`,
-    borderRadius: borderRadius.md,
-    fontFamily: fonts.body,
-    boxSizing: 'border-box'
-  },
+  searchIcon: { fontSize: '16px' },
+  searchInput: { flex: 1, border: 'none', outline: 'none', fontSize: '15px', backgroundColor: 'transparent', fontFamily: FONT },
   suggestions: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: colors.white,
-    border: `1px solid ${colors.warmGray}`,
-    borderTop: 'none',
-    borderRadius: `0 0 ${borderRadius.md} ${borderRadius.md}`,
-    zIndex: 10,
-    maxHeight: '150px',
-    overflowY: 'auto'
+    position: 'absolute', top: '100%', left: 0, right: 0,
+    backgroundColor: 'white', borderRadius: '0 0 10px 10px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '150px', overflowY: 'auto'
   },
   suggestionItem: {
-    width: '100%',
-    padding: spacing.sm,
-    backgroundColor: colors.white,
-    border: 'none',
-    borderBottom: `1px solid ${colors.warmGray}`,
-    textAlign: 'left',
-    cursor: 'pointer',
-    fontSize: fontSizes.sm,
-    fontFamily: fonts.body,
-    color: colors.textSecondary
+    width: '100%', padding: '10px 14px', backgroundColor: 'white', border: 'none',
+    borderBottom: '1px solid #F0F0F0', textAlign: 'left', cursor: 'pointer',
+    fontSize: '14px', fontFamily: FONT, color: '#636E72'
   },
+  customRow: { display: 'flex', gap: '8px', marginBottom: '8px' },
   customInput: {
-    display: 'flex',
-    gap: spacing.xs
-  },
-  input: {
-    flex: 1,
-    padding: spacing.sm,
-    fontSize: fontSizes.sm,
-    border: `1px solid ${colors.warmGray}`,
-    borderRadius: borderRadius.md,
-    fontFamily: fonts.body,
-    boxSizing: 'border-box'
+    flex: 1, padding: '10px 14px', fontSize: '15px', fontFamily: FONT,
+    border: 'none', borderRadius: '10px', backgroundColor: 'white',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', outline: 'none', color: '#2D3436'
   },
   addButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonPrimary,
-    padding: `${spacing.sm} ${spacing.md}`
+    padding: '10px 16px', backgroundColor: colors.forest, color: 'white',
+    border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: FONT,
+    fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap'
   },
   generatorButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonSecondary,
-    padding: spacing.sm
+    width: '100%', padding: '10px 14px', backgroundColor: 'white',
+    border: 'none', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    cursor: 'pointer', fontFamily: FONT, fontSize: '14px', color: '#636E72',
+    textAlign: 'left', marginBottom: '20px'
   },
-  emptyState: {
-    textAlign: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.cream,
-    borderRadius: borderRadius.lg
+  empty: { backgroundColor: 'white', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  emptyText: { fontSize: '16px', color: '#636E72', margin: 0 },
+  section: { marginBottom: '16px' },
+  sectionHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #F0F0F0'
   },
-  emptyStateText: {
-    fontSize: fontSizes.md,
-    color: colors.textSecondary,
-    margin: 0,
-    marginBottom: spacing.sm
-  },
-  emptyStateButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonPrimary
-  },
-  itemsSection: {
-    marginBottom: spacing.md
-  },
-  itemsHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: spacing.sm,
-    borderBottom: `1px solid ${colors.warmGray}`,
-    marginBottom: spacing.sm
-  },
-  itemsTitle: {
-    fontSize: fontSizes.sm,
-    fontWeight: 600,
-    color: colors.textPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  },
-  clearButton: {
-    padding: `4px ${spacing.sm}`,
-    backgroundColor: 'transparent',
-    border: `1px solid ${colors.warmGray}`,
-    borderRadius: borderRadius.md,
-    fontSize: fontSizes.xs,
-    color: colors.textMuted,
-    cursor: 'pointer',
-    fontFamily: fonts.body
-  },
-  itemsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.xs
-  },
+  sectionTitle: { fontSize: '12px', fontWeight: 600, color: '#636E72', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  clearBtn: { padding: '4px 10px', backgroundColor: 'transparent', border: '1px solid #E1E8ED', borderRadius: '6px', fontSize: '12px', color: '#636E72', cursor: 'pointer', fontFamily: FONT },
+  list: { display: 'flex', flexDirection: 'column', gap: '6px' },
   item: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    border: `1px solid ${colors.warmGray}`
+    display: 'flex', alignItems: 'center', gap: '10px',
+    backgroundColor: 'white', borderRadius: '10px', padding: '12px 14px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
   },
   itemChecked: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.cream,
-    borderRadius: borderRadius.md,
-    border: `1px solid ${colors.warmGray}`
+    display: 'flex', alignItems: 'center', gap: '10px',
+    backgroundColor: '#F5F7FA', borderRadius: '10px', padding: '10px 14px'
   },
-  checkbox: {
-    width: '20px',
-    height: '20px',
-    cursor: 'pointer',
-    flexShrink: 0
-  },
-  itemContent: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  itemName: {
-    fontSize: fontSizes.sm,
-    color: colors.textPrimary,
-    fontWeight: 500
-  },
-  itemNameChecked: {
-    fontSize: fontSizes.sm,
-    color: colors.textMuted,
-    fontWeight: 400,
-    textDecoration: 'line-through'
-  },
-  quantitySection: {
-    display: 'flex',
-    gap: spacing.xs,
-    minWidth: '140px'
-  },
-  quantityInput: {
-    width: '60px',
-    padding: `4px ${spacing.xs}`,
-    fontSize: fontSizes.xs,
-    border: `1px solid ${colors.warmGray}`,
-    borderRadius: borderRadius.sm,
-    fontFamily: fonts.body,
-    boxSizing: 'border-box'
-  },
-  unitInput: {
-    flex: 1,
-    padding: `4px ${spacing.xs}`,
-    fontSize: fontSizes.xs,
-    border: `1px solid ${colors.warmGray}`,
-    borderRadius: borderRadius.sm,
-    fontFamily: fonts.body,
-    boxSizing: 'border-box'
-  },
-  deleteButton: {
-    width: '28px',
-    height: '28px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: 'transparent',
-    fontSize: fontSizes.sm,
-    cursor: 'pointer',
-    color: colors.textMuted,
-    flexShrink: 0
-  },
-  clearAllButton: {
-    width: '100%',
-    padding: spacing.sm,
-    backgroundColor: 'transparent',
-    border: `1px dashed ${colors.warmGrayDark}`,
-    borderRadius: borderRadius.md,
-    color: colors.textMuted,
-    fontSize: fontSizes.sm,
-    fontFamily: fonts.body,
-    cursor: 'pointer',
-    marginTop: spacing.md
+  checkbox: { width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0, accentColor: colors.forest },
+  itemContent: { flex: 1 },
+  itemName: { fontSize: '15px', fontWeight: 500, color: '#2D3436' },
+  itemNameChecked: { flex: 1, fontSize: '14px', color: '#8A92A0', textDecoration: 'line-through' },
+  qtyRow: { display: 'flex', gap: '6px' },
+  qtyInput: { width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid #E1E8ED', borderRadius: '6px', fontFamily: FONT, outline: 'none' },
+  unitInput: { width: '60px', padding: '4px 8px', fontSize: '13px', border: '1px solid #E1E8ED', borderRadius: '6px', fontFamily: FONT, outline: 'none' },
+  deleteBtn: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: '#F5F7FA', borderRadius: '50%', cursor: 'pointer', fontSize: '12px', color: '#636E72', flexShrink: 0 },
+  clearAllBtn: {
+    width: '100%', padding: '10px', backgroundColor: 'transparent',
+    border: '1px dashed #BDC3C7', borderRadius: '10px', color: '#8A92A0',
+    fontSize: '13px', fontFamily: FONT, cursor: 'pointer', marginTop: '8px'
   }
 }
-
