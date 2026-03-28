@@ -1,4 +1,4 @@
-const CACHE_NAME = 'myfinance-v1';
+const CACHE_NAME = 'familyhub-v1';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -39,7 +39,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone and cache successful responses
         if (response.status === 200) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -49,7 +48,6 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Fallback to cache when offline
         return caches.match(event.request);
       })
   );
