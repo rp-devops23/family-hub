@@ -1,24 +1,30 @@
 {
-    "name": "MyFinance",
-    "short_name": "MyFinance",
-    "description": "Personal finance tracker",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#F5F7FA",
-    "theme_color": "#00A3E0",
-    "orientation": "portrait",
-    "icons": [
-      {
-        "src": "/icons/icon-192.png",
-        "sizes": "192x192",
-        "type": "image/png",
-        "purpose": "any maskable"
-      },
-      {
-        "src": "/icons/icon-512.png",
-        "sizes": "512x512",
-        "type": "image/png",
-        "purpose": "any maskable"
-      }
-    ]
-  }
+  "name": "Family Hub",
+  "short_name": "FamilyHub",
+  "description": "Finance & recipes for the family",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F7FA",
+  "theme_color": "#00A3E0",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

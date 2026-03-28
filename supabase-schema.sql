@@ -56,6 +56,8 @@ create table transactions (
   account_id uuid references accounts(id) on delete set null,
   subcategory_id uuid references subcategories(id) on delete set null,
   notes text,
+  recurring_template_id uuid references recurring_templates(id) on delete set null,
+  attachment_url text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -101,7 +103,10 @@ create table recurring_templates (
   end_date date,
   notes text,
   is_active boolean default true,
-  created_at timestamptz default now()
+  month_of_year integer,
+  last_skipped_date date,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- ============================================================================
@@ -200,6 +205,8 @@ create table shopping_items (
   unit text,
   checked boolean default false,
   sort_order integer default 0,
+  custom_name text,
+  count numeric(10,2),
   created_at timestamptz default now()
 );
 

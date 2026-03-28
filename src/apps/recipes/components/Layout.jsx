@@ -4,8 +4,10 @@ import CalendarPage from './CalendarPage'
 import ShoppingListPage from './ShoppingListPage'
 import SettingsPage from './SettingsPage'
 
+const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+
 export default function Layout({ onHome }) {
-  const { t, currentTab, setCurrentTab, shoppingItems } = useApp()
+  const { t, language, toggleLanguage, signOut, currentTab, setCurrentTab, shoppingItems } = useApp()
 
   const uncheckedCount = shoppingItems.filter(item => !item.checked).length
 
@@ -23,20 +25,35 @@ export default function Layout({ onHome }) {
     { id: 'recipes', label: t('nav.recipes'), icon: '🍳' },
     { id: 'calendar', label: t('nav.calendar'), icon: '📅' },
     { id: 'shopping', label: t('nav.shopping'), icon: '🛒', badge: uncheckedCount },
-    { id: 'settings', label: t('nav.settings'), icon: '⚙️' }
   ]
 
   return (
     <div style={styles.container}>
-      {onHome && (
-        <div style={styles.hubBar}>
-          <button onClick={onHome} style={styles.hubBtn}>
-            ← {t('nav.recipes') === 'Recettes' ? 'Accueil' : 'Home'}
+      <header style={styles.header}>
+        <div style={styles.logo}>
+          {onHome && (
+            <button onClick={onHome} style={styles.homeBtn} title={language === 'fr' ? 'Accueil' : 'Home'}>
+              🏠
+            </button>
+          )}
+          <span style={styles.logoIcon}>🍽️</span>
+          <span style={styles.logoText}>{language === 'fr' ? 'Mes Recettes' : 'My Recipes'}</span>
+        </div>
+
+        <div style={styles.actions}>
+          <button onClick={toggleLanguage} style={styles.langBtn}>
+            {language === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}
+          </button>
+          <button onClick={() => setCurrentTab('settings')} style={{ ...styles.actionBtn, ...(currentTab === 'settings' ? styles.actionBtnActive : {}) }} title={t('nav.settings')}>
+            ⚙️
+          </button>
+          <button onClick={signOut} style={styles.actionBtn} title={language === 'fr' ? 'Se déconnecter' : 'Sign out'}>
+            🚪
           </button>
         </div>
-      )}
+      </header>
 
-      <main style={{ ...styles.main, paddingTop: onHome ? '44px' : '0' }}>
+      <main style={styles.main}>
         {renderPage()}
       </main>
 
@@ -67,25 +84,45 @@ export default function Layout({ onHome }) {
 const styles = {
   container: {
     minHeight: '100vh', display: 'flex', flexDirection: 'column',
-    backgroundColor: '#F5F7FA',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   },
-  hubBar: {
-    position: 'fixed', top: 0, left: 0, right: 0, height: '44px',
-    backgroundColor: 'white', borderBottom: '1px solid #E1E8ED',
-    display: 'flex', alignItems: 'center', paddingLeft: '16px', zIndex: 200
+  header: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '12px 16px', backgroundColor: 'white',
+    borderBottom: '1px solid #E1E8ED',
+    position: 'sticky', top: 0, zIndex: 200,
+    boxSizing: 'border-box'
   },
-  hubBtn: {
-    background: 'none', border: 'none', color: '#00A3E0', fontSize: '14px',
-    fontWeight: 600, cursor: 'pointer',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  logo: { display: 'flex', alignItems: 'center', gap: '8px' },
+  homeBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: '32px', height: '32px',
+    border: '1px solid #E1E8ED', borderRadius: '8px',
+    background: 'white', fontSize: '16px', cursor: 'pointer', padding: 0
+  },
+  logoIcon: { fontSize: '24px' },
+  logoText: { fontSize: '20px', fontWeight: 700, color: '#2D3436', fontFamily: FONT },
+  actions: { display: 'flex', alignItems: 'center', gap: '8px' },
+  langBtn: {
+    padding: '6px 12px', border: '1px solid #E1E8ED', borderRadius: '6px',
+    background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT
+  },
+  actionBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: '36px', height: '36px',
+    border: '1px solid #E1E8ED', borderRadius: '8px',
+    background: 'white', cursor: 'pointer', fontSize: '18px'
+  },
+  actionBtnActive: {
+    backgroundColor: '#F0F9FF', borderColor: '#00A3E0'
   },
   main: { flex: 1, paddingBottom: '80px', overflowY: 'auto' },
   nav: {
-    position: 'fixed', bottom: 0, left: 0, right: 0, height: '70px',
+    position: 'fixed', bottom: 0,
+    left: '50%', transform: 'translateX(-50%)',
+    width: '100%', maxWidth: '600px',
     backgroundColor: 'white', borderTop: '1px solid #E1E8ED',
     display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-    paddingBottom: 'env(safe-area-inset-bottom)', zIndex: 100
+    padding: '8px 0 max(8px, env(safe-area-inset-bottom))', zIndex: 100
   },
   tab: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',

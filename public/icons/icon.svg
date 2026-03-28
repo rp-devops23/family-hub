@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#00A3E0"/>
+
+  <!-- House shape -->
+  <path d="M256 110 L390 230 L390 400 L122 400 L122 230 Z" fill="white" opacity="0.15"/>
+  <!-- Roof -->
+  <path d="M100 248 L256 108 L412 248" stroke="white" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- House body -->
+  <rect x="148" y="248" width="216" height="152" rx="8" fill="white" opacity="0.95"/>
+
+  <!-- Door -->
+  <rect x="224" y="316" width="64" height="84" rx="8" fill="#00A3E0"/>
+
+  <!-- Left window — coin / finance -->
+  <rect x="164" y="272" width="52" height="44" rx="6" fill="#00A3E0" opacity="0.85"/>
+  <text x="190" y="301" text-anchor="middle" font-size="26" font-family="system-ui">💰</text>
+
+  <!-- Right window — fork / recipes -->
+  <rect x="296" y="272" width="52" height="44" rx="6" fill="#00A3E0" opacity="0.85"/>
+  <text x="322" y="301" text-anchor="middle" font-size="26" font-family="system-ui">🍽️</text>
+</svg>
