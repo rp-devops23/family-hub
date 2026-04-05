@@ -25,6 +25,16 @@ const APPS = [
     color: '#2D5A3D',
     bg: '#F0FFF4',
   },
+  {
+    id: 'agent',
+    icon: '🤖',
+    titleFr: 'Agent IA',
+    titleEn: 'AI Agent',
+    descFr: 'Assistant famille intelligent',
+    descEn: 'Smart family assistant',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+  },
 ];
 
 export default function PortalPage({ onSelectApp }) {
@@ -145,7 +155,7 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '16px',
   },
   card: {

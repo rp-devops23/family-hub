@@ -4,6 +4,7 @@ import { AppProvider } from './apps/finance/context/AppContext';
 import LoginPage from './apps/finance/pages/LoginPage';
 import FinanceApp from './apps/finance/FinanceApp';
 import RecipeApp from './apps/recipes/RecipeApp';
+import AgentApp from './apps/agent/AgentApp';
 import PortalPage from './portal/PortalPage';
 import './App.css';
 
@@ -34,6 +35,10 @@ function AppInner() {
 
   if (activeApp === 'recipes') {
     return <RecipeApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'agent') {
+    return <AgentApp onHome={() => setActiveApp(null)} />;
   }
 
   return <PortalPage onSelectApp={setActiveApp} />;
