@@ -6,6 +6,7 @@ const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 // In dev, set VITE_FUNCTIONS_URL=http://localhost:54321/functions/v1 to test locally
 const FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL
   ?? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // ============================================================================
 // AGENT PAGE — Conversational AI chat interface
@@ -73,18 +74,20 @@ export default function AgentPage({ onHome }) {
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+
       const res = await fetch(`${FUNCTIONS_URL}/family-agent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({ message: text, conversationId: activeConvId }),
       })
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (!res.ok || data.error) throw new Error(data.error ?? data.message ?? `HTTP ${res.status}`)
 
       // Set conversation if new
       if (!activeConvId) {
@@ -100,7 +103,7 @@ export default function AgentPage({ onHome }) {
       setMessages(prev => [...prev, {
         id: 'temp-err',
         role: 'assistant',
-        content: t('Désolé, une erreur est survenue. Réessaie.', 'Sorry, something went wrong. Please try again.'),
+        content: `${t('Erreur', 'Error')}: ${err.message}`,
         created_at: new Date().toISOString(),
         error: true,
       }])
