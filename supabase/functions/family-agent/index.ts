@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
     if (!message?.trim()) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     if (authError || !user) {
       console.error('Auth error:', authError)
       return new Response(JSON.stringify({ error: 'Unauthorized: ' + (authError?.message ?? 'no user') }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       if (convErr) {
         console.error('Create conversation error:', convErr)
         return new Response(JSON.stringify({ error: 'DB error: ' + convErr.message }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
       convId = conv.id
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     if (msgErr) {
       console.error('Save message error:', msgErr)
       return new Response(JSON.stringify({ error: 'DB error: ' + msgErr.message }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -131,7 +131,7 @@ Réponds dans la langue de l'utilisateur. Sois concis et pratique. N'invente pas
       const errText = await anthropicRes.text()
       console.error('Anthropic error:', anthropicRes.status, errText)
       return new Response(JSON.stringify({ error: `Anthropic error ${anthropicRes.status}: ${errText}` }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -140,7 +140,7 @@ Réponds dans la langue de l'utilisateur. Sois concis et pratique. N'invente pas
     if (!reply) {
       console.error('Empty Anthropic response:', JSON.stringify(aiData))
       return new Response(JSON.stringify({ error: 'Empty response from AI' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
@@ -157,7 +157,7 @@ Réponds dans la langue de l'utilisateur. Sois concis et pratique. N'invente pas
     console.error('Unhandled error:', err)
     return new Response(
       JSON.stringify({ error: err?.message ?? 'Internal error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
