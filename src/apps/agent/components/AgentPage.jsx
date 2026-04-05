@@ -72,7 +72,15 @@ export default function AgentPage({ onHome }) {
       const { data, error: fnError } = await supabase.functions.invoke('family-agent', {
         body: { message: text, conversationId: activeConvId },
       })
-      if (fnError) throw fnError
+      if (fnError) {
+        // Extract actual error message from function response body
+        let msg = fnError.message
+        try {
+          const body = await fnError.context?.json?.()
+          if (body?.error) msg = body.error
+        } catch {}
+        throw new Error(msg)
+      }
       if (data?.error) throw new Error(data.error)
 
       // Set conversation if new
