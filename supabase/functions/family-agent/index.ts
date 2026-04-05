@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
@@ -6,20 +5,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Detect if message likely needs a more capable model
 function needsSonnet(message: string): boolean {
-  const complexKeywords = ['analyse', 'analyze', 'compare', 'tendance', 'trend', 'prévision', 'forecast', 'explique', 'explain', 'pourquoi', 'why', 'stratégie', 'strategy']
-  const lower = message.toLowerCase()
-  return complexKeywords.some(k => lower.includes(k)) || message.length > 300
+  const keywords = ['analyse', 'analyze', 'compare', 'tendance', 'trend', 'prévision', 'forecast', 'explique', 'explain', 'pourquoi', 'why', 'stratégie', 'strategy']
+  return keywords.some(k => message.toLowerCase().includes(k)) || message.length > 300
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { message, conversationId } = await req.json()
+    // Parse body
+    const body = await req.json()
+    const { message, conversationId } = body
 
     if (!message?.trim()) {
       return new Response(JSON.stringify({ error: 'Message is required' }), {
@@ -27,52 +26,68 @@ serve(async (req) => {
       })
     }
 
-    // Authenticate user via JWT
+    // Auth — get user from JWT
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    const anonClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    )
-    const { data: { user }, error: authError } = await anonClient.auth.getUser()
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!
+
+    // User client (validates JWT)
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    })
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      console.error('Auth error:', authError)
+      return new Response(JSON.stringify({ error: 'Unauthorized: ' + (authError?.message ?? 'no user') }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // Service client for privileged DB access
-    const db = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    // Service client for DB writes
+    const db = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false }
+    })
 
     // Get or create conversation
     let convId = conversationId
     if (!convId) {
-      const { data: conv, error: convError } = await db
+      const { data: conv, error: convErr } = await db
         .from('agent_conversations')
         .insert({ user_id: user.id, title: message.slice(0, 60) })
         .select('id')
         .single()
-      if (convError) throw convError
+      if (convErr) {
+        console.error('Create conversation error:', convErr)
+        return new Response(JSON.stringify({ error: 'DB error: ' + convErr.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
       convId = conv.id
     }
 
     // Save user message
-    await db.from('agent_messages').insert({
+    const { error: msgErr } = await db.from('agent_messages').insert({
       conversation_id: convId,
       role: 'user',
       content: message
     })
+    if (msgErr) {
+      console.error('Save message error:', msgErr)
+      return new Response(JSON.stringify({ error: 'DB error: ' + msgErr.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
-    // Load conversation history (last 20 exchanges)
+    // Load conversation history
     const { data: history } = await db
       .from('agent_messages')
       .select('role, content')
@@ -80,94 +95,68 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
       .limit(40)
 
-    // Load user context from app tables (read-only, scoped to user)
-    const [{ data: recentTx }, { data: budgets }, { data: recipes }, { data: shoppingItems }] = await Promise.all([
-      db.from('transactions')
-        .select('date, amount, description')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-        .limit(15),
-      db.from('budgets')
-        .select('name, amount_limit, period')
-        .eq('user_id', user.id)
-        .eq('is_active', true),
-      db.from('recipes')
-        .select('name, meal_type, difficulty, prep_time_minutes')
-        .eq('user_id', user.id)
-        .limit(20),
-      db.from('shopping_items')
-        .select('name, quantity, unit, checked')
-        .eq('user_id', user.id)
-        .eq('checked', false)
-        .limit(20),
+    const messages = history?.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })) ?? [{ role: 'user' as const, content: message }]
+
+    // Load user context
+    const [{ data: recentTx }, { data: budgets }, { data: recipes }, { data: shopping }] = await Promise.all([
+      db.from('transactions').select('date, amount, description').eq('user_id', user.id).order('date', { ascending: false }).limit(10),
+      db.from('budgets').select('name, amount_limit, period').eq('user_id', user.id).eq('is_active', true),
+      db.from('recipes').select('name, meal_type').eq('user_id', user.id).limit(15),
+      db.from('shopping_items').select('name, quantity, unit').eq('user_id', user.id).eq('checked', false).limit(20),
     ])
 
-    const systemPrompt = `Tu es Family Agent, l'assistant IA personnel de la famille. Tu aides avec les finances personnelles, la planification des repas, les recettes et l'organisation familiale.
+    const systemPrompt = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes et l'organisation.
 
-Tu as accès en lecture aux données de la famille :
-
-FINANCES :
-- Dernières transactions : ${JSON.stringify(recentTx?.slice(0, 10) ?? [])}
+Données de la famille :
+- Dernières transactions : ${JSON.stringify(recentTx ?? [])}
 - Budgets actifs : ${JSON.stringify(budgets ?? [])}
+- Recettes disponibles : ${JSON.stringify(recipes ?? [])}
+- Liste de courses : ${JSON.stringify(shopping ?? [])}
 
-RECETTES & COURSES :
-- Recettes disponibles : ${JSON.stringify(recipes?.slice(0, 10) ?? [])}
-- Liste de courses (articles non cochés) : ${JSON.stringify(shoppingItems ?? [])}
+Réponds dans la langue de l'utilisateur. Sois concis et pratique. N'invente pas de données.`
 
-INSTRUCTIONS :
-- Réponds dans la langue de l'utilisateur (français ou anglais)
-- Sois concis, bienveillant et pratique
-- Pour les questions financières, base-toi sur les vraies données ci-dessus
-- Tu peux suggérer des recettes, analyser les dépenses, aider à planifier les repas
-- N'invente jamais de données que tu n'as pas
-- Format : texte simple, pas de markdown complexe (l'app ne le rend pas)`
-
+    // Call Anthropic
     const model = needsSonnet(message) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
-
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': Deno.env.get('ANTHROPIC_API_KEY')!,
+        'x-api-key': anthropicKey,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: (history ?? []).map(m => ({ role: m.role, content: m.content })),
-      }),
+      body: JSON.stringify({ model, max_tokens: 1024, system: systemPrompt, messages }),
     })
 
     if (!anthropicRes.ok) {
-      const err = await anthropicRes.text()
-      throw new Error(`Anthropic error: ${err}`)
+      const errText = await anthropicRes.text()
+      console.error('Anthropic error:', anthropicRes.status, errText)
+      return new Response(JSON.stringify({ error: `Anthropic error ${anthropicRes.status}: ${errText}` }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     const aiData = await anthropicRes.json()
-    const reply = aiData.content[0].text
+    const reply = aiData.content?.[0]?.text
+    if (!reply) {
+      console.error('Empty Anthropic response:', JSON.stringify(aiData))
+      return new Response(JSON.stringify({ error: 'Empty response from AI' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Save assistant reply
-    await db.from('agent_messages').insert({
-      conversation_id: convId,
-      role: 'assistant',
-      content: reply
-    })
-
-    // Update conversation updated_at
-    await db.from('agent_conversations')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', convId)
+    await db.from('agent_messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
+    await db.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId)
 
     return new Response(
       JSON.stringify({ message: reply, conversationId: convId, model }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
-    console.error('Family agent error:', error)
+  } catch (err) {
+    console.error('Unhandled error:', err)
     return new Response(
-      JSON.stringify({ error: error.message ?? 'Internal error' }),
+      JSON.stringify({ error: err?.message ?? 'Internal error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
