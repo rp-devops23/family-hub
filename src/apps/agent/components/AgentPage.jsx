@@ -69,8 +69,14 @@ export default function AgentPage({ onHome }) {
     setMessages(prev => [...prev, tempUserMsg])
 
     try {
+      // Explicitly pass the user JWT — supabase.functions.invoke() may not send it
+      // automatically with the new sb_publishable_ key format
+      const { data: { session } } = await supabase.auth.getSession()
+      const authHeader = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+
       const { data, error: fnError } = await supabase.functions.invoke('family-agent', {
         body: { message: text, conversationId: activeConvId },
+        headers: authHeader,
       })
       if (fnError) throw new Error(fnError.message)
       if (data?.error) throw new Error(data.error)

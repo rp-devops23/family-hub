@@ -6,7 +6,7 @@ const corsHeaders = {
 }
 
 function needsSonnet(message: string): boolean {
-  const keywords = ['analyse', 'analyze', 'compare', 'tendance', 'trend', 'prévision', 'forecast', 'explique', 'explain', 'pourquoi', 'why', 'stratégie', 'strategy']
+  const keywords = ['analyse', 'analyze', 'compare', 'tendance', 'trend', 'prevision', 'forecast', 'explique', 'explain', 'pourquoi', 'why', 'strategie', 'strategy']
   return keywords.some(k => message.toLowerCase().includes(k)) || message.length > 300
 }
 
@@ -15,47 +15,34 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const ok = (body: unknown) => new Response(JSON.stringify(body), {
+    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+
   try {
-    // Parse body
-    const body = await req.json()
-    const { message, conversationId } = body
-
-    if (!message?.trim()) {
-      return new Response(JSON.stringify({ error: 'Message is required' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // Auth — get user from JWT
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    const { message, conversationId } = await req.json()
+    if (!message?.trim()) return ok({ error: 'Message is required' })
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!
 
-    // User client (validates JWT)
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return ok({ error: 'Missing Authorization header — not logged in?' })
+
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false }
     })
     const { data: { user }, error: authError } = await userClient.auth.getUser()
     if (authError || !user) {
-      console.error('Auth error:', authError)
-      return new Response(JSON.stringify({ error: 'Unauthorized: ' + (authError?.message ?? 'no user') }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      console.error('Auth error:', authError?.message)
+      return ok({ error: 'Auth failed: ' + (authError?.message ?? 'no user') })
     }
 
-    // Service client for DB writes
-    const db = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
-    })
+    const db = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
 
     // Get or create conversation
     let convId = conversationId
@@ -63,101 +50,56 @@ Deno.serve(async (req) => {
       const { data: conv, error: convErr } = await db
         .from('agent_conversations')
         .insert({ user_id: user.id, title: message.slice(0, 60) })
-        .select('id')
-        .single()
-      if (convErr) {
-        console.error('Create conversation error:', convErr)
-        return new Response(JSON.stringify({ error: 'DB error: ' + convErr.message }), {
-          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
+        .select('id').single()
+      if (convErr) { console.error('Conv error:', convErr.message); return ok({ error: 'DB: ' + convErr.message }) }
       convId = conv.id
     }
 
     // Save user message
-    const { error: msgErr } = await db.from('agent_messages').insert({
-      conversation_id: convId,
-      role: 'user',
-      content: message
-    })
-    if (msgErr) {
-      console.error('Save message error:', msgErr)
-      return new Response(JSON.stringify({ error: 'DB error: ' + msgErr.message }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    const { error: msgErr } = await db.from('agent_messages').insert({ conversation_id: convId, role: 'user', content: message })
+    if (msgErr) { console.error('Msg error:', msgErr.message); return ok({ error: 'DB: ' + msgErr.message }) }
 
-    // Load conversation history
-    const { data: history } = await db
-      .from('agent_messages')
-      .select('role, content')
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: true })
-      .limit(40)
-
+    // Load history
+    const { data: history } = await db.from('agent_messages').select('role, content').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(40)
     const messages = history?.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })) ?? [{ role: 'user' as const, content: message }]
 
-    // Load user context
-    const [{ data: recentTx }, { data: budgets }, { data: recipes }, { data: shopping }] = await Promise.all([
+    // Load context
+    const [{ data: tx }, { data: budgets }, { data: recipes }, { data: shopping }] = await Promise.all([
       db.from('transactions').select('date, amount, description').eq('user_id', user.id).order('date', { ascending: false }).limit(10),
       db.from('budgets').select('name, amount_limit, period').eq('user_id', user.id).eq('is_active', true),
       db.from('recipes').select('name, meal_type').eq('user_id', user.id).limit(15),
       db.from('shopping_items').select('name, quantity, unit').eq('user_id', user.id).eq('checked', false).limit(20),
     ])
 
-    const systemPrompt = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes et l'organisation.
-
-Données de la famille :
-- Dernières transactions : ${JSON.stringify(recentTx ?? [])}
-- Budgets actifs : ${JSON.stringify(budgets ?? [])}
-- Recettes disponibles : ${JSON.stringify(recipes ?? [])}
-- Liste de courses : ${JSON.stringify(shopping ?? [])}
-
-Réponds dans la langue de l'utilisateur. Sois concis et pratique. N'invente pas de données.`
+    const system = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes et l'organisation.
+Données : transactions=${JSON.stringify(tx ?? [])}, budgets=${JSON.stringify(budgets ?? [])}, recettes=${JSON.stringify(recipes ?? [])}, courses=${JSON.stringify(shopping ?? [])}.
+Réponds dans la langue de l'utilisateur. Sois concis. N'invente pas de données.`
 
     // Call Anthropic
     const model = needsSonnet(message) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({ model, max_tokens: 1024, system: systemPrompt, messages }),
+      headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 1024, system, messages }),
     })
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text()
-      console.error('Anthropic error:', anthropicRes.status, errText)
-      return new Response(JSON.stringify({ error: `Anthropic error ${anthropicRes.status}: ${errText}` }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+    if (!res.ok) {
+      const txt = await res.text()
+      console.error('Anthropic error:', res.status, txt)
+      return ok({ error: `Anthropic ${res.status}: ${txt}` })
     }
 
-    const aiData = await anthropicRes.json()
-    const reply = aiData.content?.[0]?.text
-    if (!reply) {
-      console.error('Empty Anthropic response:', JSON.stringify(aiData))
-      return new Response(JSON.stringify({ error: 'Empty response from AI' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
+    const ai = await res.json()
+    const reply = ai.content?.[0]?.text
+    if (!reply) return ok({ error: 'Empty AI response: ' + JSON.stringify(ai) })
 
-    // Save assistant reply
     await db.from('agent_messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
     await db.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId)
 
-    return new Response(
-      JSON.stringify({ message: reply, conversationId: convId, model }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return ok({ message: reply, conversationId: convId, model })
 
   } catch (err) {
-    console.error('Unhandled error:', err)
-    return new Response(
-      JSON.stringify({ error: err?.message ?? 'Internal error' }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('Unhandled:', err?.message)
+    return ok({ error: 'Unhandled error: ' + (err?.message ?? String(err)) })
   }
 })
