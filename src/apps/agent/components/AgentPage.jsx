@@ -3,7 +3,9 @@ import { useAuth } from '../../../context/AuthContext'
 import { supabase } from '../../../lib/supabase'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+// In dev, set VITE_FUNCTIONS_URL=http://localhost:54321/functions/v1 to test locally
+const FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL
+  ?? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
 
 // ============================================================================
 // AGENT PAGE — Conversational AI chat interface
@@ -71,7 +73,7 @@ export default function AgentPage({ onHome }) {
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/family-agent`, {
+      const res = await fetch(`${FUNCTIONS_URL}/family-agent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
