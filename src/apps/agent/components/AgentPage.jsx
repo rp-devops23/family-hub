@@ -3,10 +3,6 @@ import { useAuth } from '../../../context/AuthContext'
 import { supabase } from '../../../lib/supabase'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-// In dev, set VITE_FUNCTIONS_URL=http://localhost:54321/functions/v1 to test locally
-const FUNCTIONS_URL = import.meta.env.VITE_FUNCTIONS_URL
-  ?? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // ============================================================================
 // AGENT PAGE — Conversational AI chat interface
@@ -73,30 +69,20 @@ export default function AgentPage({ onHome }) {
     setMessages(prev => [...prev, tempUserMsg])
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not authenticated')
-
-      const res = await fetch(`${FUNCTIONS_URL}/family-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ message: text, conversationId: activeConvId }),
+      const { data, error: fnError } = await supabase.functions.invoke('family-agent', {
+        body: { message: text, conversationId: activeConvId },
       })
-
-      const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error ?? data.message ?? `HTTP ${res.status}`)
+      if (fnError) throw fnError
+      if (data?.error) throw new Error(data.error)
 
       // Set conversation if new
-      if (!activeConvId) {
+      if (!activeConvId && data?.conversationId) {
         setActiveConvId(data.conversationId)
         await loadConversations()
       }
 
       // Reload messages from DB (removes temp, adds real IDs)
-      await loadMessages(data.conversationId ?? activeConvId)
+      await loadMessages(data?.conversationId ?? activeConvId)
 
     } catch (err) {
       console.error('Agent error:', err)
