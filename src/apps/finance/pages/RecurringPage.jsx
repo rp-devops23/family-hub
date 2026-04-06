@@ -13,6 +13,7 @@ export default function RecurringPage() {
     getSubcategory, getCategoryForSubcategory, getAccount
   } = useApp();
 
+  const [tab, setTab] = useState('pending'); // 'pending' | 'templates'
   const [showForm, setShowForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -239,6 +240,7 @@ export default function RecurringPage() {
 
   return (
     <div style={styles.container}>
+      {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.title}>🔄 {t('Récurrences', 'Recurring')}</h1>
         <button onClick={() => setShowForm(true)} style={styles.addBtnHeader}>
@@ -246,175 +248,151 @@ export default function RecurringPage() {
         </button>
       </div>
 
-      {/* Pending Transactions */}
-      {pendingTransactions.length > 0 && (
+      {/* Tabs */}
+      <div style={styles.tabs}>
+        <button
+          onClick={() => setTab('pending')}
+          style={{ ...styles.tabBtn, ...(tab === 'pending' ? styles.tabBtnActive : {}) }}
+        >
+          ⏳ {t('À approuver', 'To approve')}
+          {pendingTransactions.length > 0 && (
+            <span style={styles.tabBadge}>{pendingTransactions.length}</span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('templates')}
+          style={{ ...styles.tabBtn, ...(tab === 'templates' ? styles.tabBtnActive : {}) }}
+        >
+          🔄 {t('Modèles', 'Templates')}
+          <span style={{ ...styles.tabBadge, backgroundColor: '#636E72' }}>{activeTemplates.length}</span>
+        </button>
+      </div>
+
+      {/* TAB: À approuver */}
+      {tab === 'pending' && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            ⏳ {t('En attente', 'Pending')} ({pendingTransactions.length})
-          </h2>
-          <div style={styles.pendingList}>
-            {pendingTransactions.map(template => {
-              const isIncome = template.type === 'income';
-              const category = getCategoryForSubcategory(template.subcategory_id);
-              const subcategory = getSubcategory(template.subcategory_id);
-              const occKey = template._occurrenceKey;
+          {pendingTransactions.length === 0 ? (
+            <div style={styles.empty}>
+              <span style={styles.emptyIcon}>✅</span>
+              <p style={styles.emptyText}>{t('Tout est à jour !', 'All up to date!')}</p>
+              <p style={styles.emptySubtext}>{t('Aucune transaction en attente', 'No pending transactions')}</p>
+            </div>
+          ) : (
+            <div style={styles.pendingList}>
+              {pendingTransactions.map(template => {
+                const isIncome = template.type === 'income';
+                const category = getCategoryForSubcategory(template.subcategory_id);
+                const subcategory = getSubcategory(template.subcategory_id);
+                const occKey = template._occurrenceKey;
 
-              return (
-                <div key={occKey} style={styles.pendingCard}>
-                  <div style={styles.pendingLeft}>
-                    <div style={{
-                      ...styles.pendingDot,
-                      backgroundColor: isIncome ? '#27AE60' : (category?.color || '#00A3E0')
-                    }} />
-                    <div>
-                      <span style={styles.pendingDesc}>{template.description}</span>
-                      <span style={styles.pendingMeta}>
-                        {isIncome ? t('💰 Revenu', '💰 Income') : (language === 'fr' ? subcategory?.name_fr : subcategory?.name_en)}
-                        {' • '}
-                        {formatDate(template.expectedDate)}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={styles.pendingRight}>
-                    <span style={{ ...styles.pendingAmount, color: isIncome ? '#27AE60' : '#2D3436' }}>
-                      {isIncome ? '+' : ''}{formatAmount(template.amount)}
-                    </span>
-                    <button
-                      onClick={() => handleDecline(template)}
-                      style={styles.declineBtn}
-                      disabled={decliningId === occKey}
-                      title={t('Ignorer', 'Skip')}
-                    >
-                      {decliningId === occKey ? '...' : '✕'}
-                    </button>
-                    <button
-                      onClick={() => handleGenerateTransaction(template)}
-                      style={styles.generateBtn}
-                      disabled={generatingId === occKey}
-                      title={t('Accepter', 'Accept')}
-                    >
-                      {generatingId === occKey ? '...' : '✓'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Active Templates */}
-      <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>
-          ✅ {t('Actives', 'Active')} ({activeTemplates.length})
-        </h2>
-        
-        {activeTemplates.length === 0 ? (
-          <div style={styles.empty}>
-            <span style={styles.emptyIcon}>🔄</span>
-            <p style={styles.emptyText}>
-              {t('Aucune récurrence créée', 'No recurring transactions')}
-            </p>
-            <p style={styles.emptySubtext}>
-              {t('Créez des modèles pour vos factures mensuelles', 
-                 'Create templates for your monthly bills')}
-            </p>
-            <button onClick={() => setShowForm(true)} style={styles.createBtn}>
-              + {t('Créer une récurrence', 'Create recurring')}
-            </button>
-          </div>
-        ) : (
-          <div style={styles.list}>
-            {activeTemplates.map(template => {
-              const isIncome = template.type === 'income';
-              const category = getCategoryForSubcategory(template.subcategory_id);
-              const subcategory = getSubcategory(template.subcategory_id);
-              const account = getAccount(template.account_id);
-
-              return (
-                <div key={template.id} style={styles.card}>
-                  <div style={styles.cardHeader}>
-                    <div style={styles.cardLeft}>
-                      <div style={{
-                        ...styles.cardIcon,
-                        backgroundColor: isIncome ? '#27AE60' : (category?.color || '#00A3E0')
-                      }}>
-                        {isIncome ? '📥' : '🔄'}
-                      </div>
+                return (
+                  <div key={occKey} style={styles.pendingCard}>
+                    <div style={styles.pendingLeft}>
+                      <div style={{ ...styles.pendingDot, backgroundColor: isIncome ? '#27AE60' : (category?.color || '#00A3E0') }} />
                       <div>
-                        <span style={styles.cardName}>{template.description}</span>
-                        <span style={styles.cardMeta}>
-                          {isIncome ? t('Revenu', 'Income') : (language === 'fr' ? subcategory?.name_fr : subcategory?.name_en)}
-                          {account && ` • ${account.name}`}
+                        <span style={styles.pendingDesc}>{template.description}</span>
+                        <span style={styles.pendingMeta}>
+                          {isIncome ? t('💰 Revenu', '💰 Income') : (language === 'fr' ? subcategory?.name_fr : subcategory?.name_en)}
+                          {' • '}
+                          {formatDate(template.expectedDate)}
                         </span>
                       </div>
                     </div>
-                    <span style={{ ...styles.cardAmount, color: isIncome ? '#27AE60' : '#2D3436' }}>
-                      {isIncome ? '+' : ''}{formatAmount(template.amount)}
-                    </span>
-                  </div>
-                  
-                  <div style={styles.cardDetails}>
-                    <span style={styles.detailChip}>
-                      📅 {getFrequencyLabel(template.frequency)}
-                    </span>
-                    <span style={styles.detailChip}>
-                      {getDayLabel(template)}
-                    </span>
-                    {template.end_date && (
-                      <span style={styles.detailChip}>
-                        → {formatDate(template.end_date)}
+                    <div style={styles.pendingRight}>
+                      <span style={{ ...styles.pendingAmount, color: isIncome ? '#27AE60' : '#2D3436' }}>
+                        {isIncome ? '+' : ''}{formatAmount(template.amount)}
                       </span>
-                    )}
+                      <button onClick={() => handleDecline(template)} style={styles.declineBtn} disabled={decliningId === occKey} title={t('Ignorer', 'Skip')}>
+                        {decliningId === occKey ? '...' : '✕'}
+                      </button>
+                      <button onClick={() => handleGenerateTransaction(template)} style={styles.generateBtn} disabled={generatingId === occKey} title={t('Accepter', 'Accept')}>
+                        {generatingId === occKey ? '...' : '✓'}
+                      </button>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-                  <div style={styles.cardActions}>
-                    <button 
-                      onClick={() => handleEdit(template)}
-                      style={styles.actionBtn}
-                    >
-                      ✎ {t('Modifier', 'Edit')}
-                    </button>
-                    <button 
-                      onClick={() => setConfirmDelete(template)}
-                      style={{...styles.actionBtn, color: '#E74C3C'}}
-                    >
-                      ✕ {t('Supprimer', 'Delete')}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Inactive Templates */}
-      {inactiveTemplates.length > 0 && (
+      {/* TAB: Modèles */}
+      {tab === 'templates' && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            ⏸️ {t('Inactives', 'Inactive')} ({inactiveTemplates.length})
-          </h2>
-          <div style={styles.list}>
-            {inactiveTemplates.map(template => (
-              <div key={template.id} style={{...styles.card, opacity: 0.6}}>
-                <div style={styles.cardHeader}>
-                  <div style={styles.cardLeft}>
-                    <span style={styles.cardName}>{template.description}</span>
+          {/* Active */}
+          {activeTemplates.length === 0 ? (
+            <div style={styles.empty}>
+              <span style={styles.emptyIcon}>🔄</span>
+              <p style={styles.emptyText}>{t('Aucune récurrence créée', 'No recurring transactions')}</p>
+              <p style={styles.emptySubtext}>{t('Créez des modèles pour vos factures mensuelles', 'Create templates for your monthly bills')}</p>
+              <button onClick={() => setShowForm(true)} style={styles.createBtn}>
+                + {t('Créer une récurrence', 'Create recurring')}
+              </button>
+            </div>
+          ) : (
+            <div style={styles.list}>
+              {activeTemplates.map(template => {
+                const isIncome = template.type === 'income';
+                const category = getCategoryForSubcategory(template.subcategory_id);
+                const subcategory = getSubcategory(template.subcategory_id);
+                const account = getAccount(template.account_id);
+
+                return (
+                  <div key={template.id} style={styles.card}>
+                    <div style={styles.cardHeader}>
+                      <div style={styles.cardLeft}>
+                        <div style={{ ...styles.cardIcon, backgroundColor: isIncome ? '#27AE60' : (category?.color || '#00A3E0') }}>
+                          {isIncome ? '📥' : '🔄'}
+                        </div>
+                        <div>
+                          <span style={styles.cardName}>{template.description}</span>
+                          <span style={styles.cardMeta}>
+                            {isIncome ? t('Revenu', 'Income') : (language === 'fr' ? subcategory?.name_fr : subcategory?.name_en)}
+                            {account && ` • ${account.name}`}
+                          </span>
+                        </div>
+                      </div>
+                      <span style={{ ...styles.cardAmount, color: isIncome ? '#27AE60' : '#2D3436' }}>
+                        {isIncome ? '+' : ''}{formatAmount(template.amount)}
+                      </span>
+                    </div>
+                    <div style={styles.cardDetails}>
+                      <span style={styles.detailChip}>📅 {getFrequencyLabel(template.frequency)}</span>
+                      <span style={styles.detailChip}>{getDayLabel(template)}</span>
+                      {template.end_date && <span style={styles.detailChip}>→ {formatDate(template.end_date)}</span>}
+                    </div>
+                    <div style={styles.cardActions}>
+                      <button onClick={() => handleEdit(template)} style={styles.actionBtn}>✎ {t('Modifier', 'Edit')}</button>
+                      <button onClick={() => setConfirmDelete(template)} style={{ ...styles.actionBtn, color: '#E74C3C' }}>✕ {t('Supprimer', 'Delete')}</button>
+                    </div>
                   </div>
-                  <span style={styles.cardAmount}>{formatAmount(template.amount)}</span>
-                </div>
-                <div style={styles.cardActions}>
-                  <button 
-                    onClick={() => handleEdit(template)}
-                    style={styles.actionBtn}
-                  >
-                    ✎ {t('Modifier', 'Edit')}
-                  </button>
-                </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Inactive */}
+          {inactiveTemplates.length > 0 && (
+            <>
+              <p style={styles.inactiveLabel}>⏸️ {t('Inactives', 'Inactive')} ({inactiveTemplates.length})</p>
+              <div style={styles.list}>
+                {inactiveTemplates.map(template => (
+                  <div key={template.id} style={{ ...styles.card, opacity: 0.6 }}>
+                    <div style={styles.cardHeader}>
+                      <div style={styles.cardLeft}>
+                        <span style={styles.cardName}>{template.description}</span>
+                      </div>
+                      <span style={styles.cardAmount}>{formatAmount(template.amount)}</span>
+                    </div>
+                    <div style={styles.cardActions}>
+                      <button onClick={() => handleEdit(template)} style={styles.actionBtn}>✎ {t('Modifier', 'Edit')}</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -486,14 +464,54 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
   },
+  tabs: {
+    display: 'flex',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '4px',
+    marginBottom: '16px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  tabBtn: {
+    flex: 1,
+    padding: '10px 8px',
+    border: 'none',
+    borderRadius: '8px',
+    background: 'none',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#636E72',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+  },
+  tabBtnActive: {
+    backgroundColor: '#F0F9FF',
+    color: '#00A3E0',
+  },
+  tabBadge: {
+    backgroundColor: '#00A3E0',
+    color: 'white',
+    fontSize: '11px',
+    fontWeight: '700',
+    minWidth: '18px',
+    height: '18px',
+    borderRadius: '9px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 4px',
+  },
   section: {
     marginBottom: '24px',
   },
-  sectionTitle: {
-    fontSize: '16px',
+  inactiveLabel: {
+    fontSize: '13px',
     fontWeight: '600',
-    color: '#2D3436',
-    marginBottom: '12px',
+    color: '#636E72',
+    margin: '20px 0 10px',
   },
   pendingList: {
     display: 'flex',
