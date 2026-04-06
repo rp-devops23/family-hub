@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../../context/AuthContext'
 import { supabase } from '../../../lib/supabase'
+import GoogleConnectPage from './GoogleConnectPage'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
@@ -18,14 +19,26 @@ export default function AgentPage({ onHome }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showConvList, setShowConvList] = useState(false)
+  const [showGoogleConnect, setShowGoogleConnect] = useState(false)
+  const [googleConnected, setGoogleConnected] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Load conversations list
+  // Load conversations list + Google status
   useEffect(() => {
     if (!user) return
     loadConversations()
+    checkGoogleStatus()
   }, [user])
+
+  async function checkGoogleStatus() {
+    const { data } = await supabase
+      .from('google_tokens')
+      .select('email')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    setGoogleConnected(!!data)
+  }
 
   // Load messages when active conversation changes
   useEffect(() => {
@@ -131,6 +144,10 @@ export default function AgentPage({ onHome }) {
     return d.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short' })
   }
 
+  if (showGoogleConnect) {
+    return <GoogleConnectPage onBack={() => { setShowGoogleConnect(false); checkGoogleStatus() }} />
+  }
+
   return (
     <div style={styles.wrapper}>
       <div style={styles.container}>
@@ -149,6 +166,13 @@ export default function AgentPage({ onHome }) {
           <div style={styles.headerRight}>
             <button onClick={startNewConversation} style={styles.newChatBtn}>
               ✏️ {t('Nouveau', 'New')}
+            </button>
+            <button
+              onClick={() => setShowGoogleConnect(true)}
+              style={{ ...styles.iconBtn, ...(googleConnected ? styles.googleBtnConnected : {}) }}
+              title={googleConnected ? t('Google connecté', 'Google connected') : t('Connecter Google', 'Connect Google')}
+            >
+              {googleConnected ? '📅✓' : '📅'}
             </button>
             <button onClick={toggleLanguage} style={styles.iconBtn}>
               {language === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}
@@ -308,6 +332,9 @@ const styles = {
     padding: '6px 12px', border: '1px solid #E1E8ED', borderRadius: '8px',
     background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT,
     fontWeight: 600, color: '#00A3E0',
+  },
+  googleBtnConnected: {
+    backgroundColor: '#F0FFF4', borderColor: '#68D391', color: '#2D5A3D',
   },
 
   // Conversation list

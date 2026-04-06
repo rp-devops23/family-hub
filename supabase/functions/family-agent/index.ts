@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { getValidAccessToken, fetchCalendarEvents, fetchGmailSummary } from "../_shared/google_refresh.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,17 +64,37 @@ Deno.serve(async (req) => {
     const { data: history } = await db.from('agent_messages').select('role, content').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(40)
     const messages = history?.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })) ?? [{ role: 'user' as const, content: message }]
 
-    // Load context
-    const [{ data: tx }, { data: budgets }, { data: recipes }, { data: shopping }] = await Promise.all([
+    // Load app context + Google context in parallel
+    const [
+      { data: tx }, { data: budgets }, { data: recipes }, { data: shopping },
+      googleAccessToken
+    ] = await Promise.all([
       db.from('transactions').select('date, amount, description').eq('user_id', user.id).order('date', { ascending: false }).limit(10),
       db.from('budgets').select('name, amount_limit, period').eq('user_id', user.id).eq('is_active', true),
       db.from('recipes').select('name, meal_type').eq('user_id', user.id).limit(15),
       db.from('shopping_items').select('name, quantity, unit').eq('user_id', user.id).eq('checked', false).limit(20),
+      getValidAccessToken(user.id),
     ])
 
-    const system = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes et l'organisation.
-Données : transactions=${JSON.stringify(tx ?? [])}, budgets=${JSON.stringify(budgets ?? [])}, recettes=${JSON.stringify(recipes ?? [])}, courses=${JSON.stringify(shopping ?? [])}.
-Réponds dans la langue de l'utilisateur. Sois concis. N'invente pas de données.`
+    // Fetch Google data if connected
+    let calendarCtx = ''
+    let gmailCtx = ''
+    if (googleAccessToken) {
+      const [cal, gmail] = await Promise.all([
+        fetchCalendarEvents(googleAccessToken),
+        fetchGmailSummary(googleAccessToken),
+      ])
+      calendarCtx = cal
+      gmailCtx = gmail
+    }
+
+    const googleSection = googleAccessToken
+      ? `\nAgenda Google (7 prochains jours):\n${calendarCtx || '(aucun événement)'}\n\nEmails non lus (Gmail):\n${gmailCtx || '(aucun)'}`
+      : '\n(Google non connecté — pas de données agenda/email)'
+
+    const system = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes, l'organisation et le calendrier.
+Données app : transactions=${JSON.stringify(tx ?? [])}, budgets=${JSON.stringify(budgets ?? [])}, recettes=${JSON.stringify(recipes ?? [])}, courses=${JSON.stringify(shopping ?? [])}.${googleSection}
+Réponds dans la langue de l'utilisateur. Sois concis et utile. N'invente pas de données.`
 
     // Call Anthropic
     const model = needsSonnet(message) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
@@ -96,7 +117,7 @@ Réponds dans la langue de l'utilisateur. Sois concis. N'invente pas de données
     await db.from('agent_messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
     await db.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId)
 
-    return ok({ message: reply, conversationId: convId, model })
+    return ok({ message: reply, conversationId: convId, model, googleConnected: !!googleAccessToken })
 
   } catch (err) {
     console.error('Unhandled:', err?.message)

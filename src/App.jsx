@@ -6,6 +6,7 @@ import FinanceApp from './apps/finance/FinanceApp';
 import RecipeApp from './apps/recipes/RecipeApp';
 import AgentApp from './apps/agent/AgentApp';
 import PortalPage from './portal/PortalPage';
+import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
 
 function AppInner() {
@@ -24,6 +25,14 @@ function AppInner() {
   }
 
   if (!user) return <LoginPage />;
+
+  // Handle Google OAuth callback redirect
+  if (window.location.pathname === '/auth/google/callback') {
+    return <GoogleCallbackPage onDone={() => {
+      window.history.replaceState({}, '', '/');
+      setActiveApp('agent');
+    }} />;
+  }
 
   if (activeApp === 'finance') {
     return (
