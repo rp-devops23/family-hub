@@ -84,11 +84,11 @@ export async function fetchCalendarEvents(accessToken: string): Promise<string> 
 }
 
 /**
- * Fetch recent Gmail subjects (last 5 unread).
+ * Fetch the 10 most recent Gmail messages (read and unread), with unread indicator.
  */
 export async function fetchGmailSummary(accessToken: string): Promise<string> {
   const listRes = await fetch(
-    'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+    'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10',
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!listRes.ok) return ''
@@ -96,9 +96,9 @@ export async function fetchGmailSummary(accessToken: string): Promise<string> {
   const list = await listRes.json()
   const messages: string[] = []
 
-  for (const msg of (list.messages ?? []).slice(0, 5)) {
+  for (const msg of (list.messages ?? []).slice(0, 10)) {
     const detailRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )
     if (!detailRes.ok) continue
@@ -106,7 +106,9 @@ export async function fetchGmailSummary(accessToken: string): Promise<string> {
     const headers: Array<{name: string, value: string}> = detail.payload?.headers ?? []
     const subject = headers.find(h => h.name === 'Subject')?.value ?? '(no subject)'
     const from = headers.find(h => h.name === 'From')?.value ?? ''
-    messages.push(`De: ${from} | Sujet: ${subject}`)
+    const date = headers.find(h => h.name === 'Date')?.value ?? ''
+    const isUnread = (detail.labelIds ?? []).includes('UNREAD')
+    messages.push(`[${isUnread ? 'NON LU' : 'lu'}] ${date} | De: ${from} | Sujet: ${subject}`)
   }
 
   return messages.join('\n')

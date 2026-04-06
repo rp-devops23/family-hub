@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     }
 
     const googleSection = googleAccessToken
-      ? `\nAgenda Google (7 prochains jours):\n${calendarCtx || '(aucun événement)'}\n\nEmails non lus (Gmail):\n${gmailCtx || '(aucun)'}`
+      ? `\nAgenda Google (7 prochains jours):\n${calendarCtx || '(aucun événement)'}\n\nEmails récents (Gmail):\n${gmailCtx || '(aucun)'}`
       : '\n(Google non connecté — pas de données agenda/email)'
 
     const system = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes, l'organisation et le calendrier.
