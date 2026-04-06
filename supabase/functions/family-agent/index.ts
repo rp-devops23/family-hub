@@ -68,12 +68,14 @@ Deno.serve(async (req) => {
     // Load app context + Google context in parallel
     const [
       { data: tx }, { data: budgets }, { data: recipes }, { data: shopping },
+      { data: tasks },
       googleAccessToken
     ] = await Promise.all([
-      db.from('transactions').select('date, amount, description').eq('user_id', user.id).order('date', { ascending: false }).limit(AGENT_CONFIG.finance.transactionsLimit),
+      db.from('transactions').select('date, amount, type, description').eq('user_id', user.id).order('date', { ascending: false }).limit(AGENT_CONFIG.finance.transactionsLimit),
       db.from('budgets').select('name, amount_limit, period').eq('user_id', user.id).eq('is_active', true).limit(AGENT_CONFIG.finance.budgetsLimit),
       db.from('recipes').select('name, meal_type').eq('user_id', user.id).limit(AGENT_CONFIG.recipes.recipesLimit),
       db.from('shopping_items').select('name, quantity, unit').eq('user_id', user.id).eq('checked', false).limit(AGENT_CONFIG.recipes.shoppingItemsLimit),
+      db.from('tasks').select('category, name, done, expires_at').eq('user_id', user.id).order('expires_at', { ascending: true }),
       getValidAccessToken(user.id),
     ])
 
@@ -93,9 +95,33 @@ Deno.serve(async (req) => {
       ? `\nAgenda Google (7 prochains jours):\n${calendarCtx || '(aucun événement)'}\n\nEmails récents (Gmail):\n${gmailCtx || '(aucun)'}`
       : '\n(Google non connecté — pas de données agenda/email)'
 
-    const system = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes, l'organisation et le calendrier.
-Données app : transactions=${JSON.stringify(tx ?? [])}, budgets=${JSON.stringify(budgets ?? [])}, recettes=${JSON.stringify(recipes ?? [])}, courses=${JSON.stringify(shopping ?? [])}.${googleSection}
-Réponds dans la langue de l'utilisateur. Sois concis et utile. N'invente pas de données.`
+    // Compute financial balance from transactions
+    const allTx = tx ?? []
+    const now = new Date()
+    const thisMonth = now.getMonth()
+    const thisYear = now.getFullYear()
+    const monthTx = allTx.filter(t => {
+      const d = new Date(t.date)
+      return d.getMonth() === thisMonth && d.getFullYear() === thisYear
+    })
+    const monthIncome = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const monthExpenses = monthTx.filter(t => (t.type || 'expense') === 'expense').reduce((s, t) => s + t.amount, 0)
+    const monthBalance = monthIncome - monthExpenses
+
+    const financeSection = `Transactions récentes: ${JSON.stringify(allTx)}\nRevenus ce mois: ${monthIncome.toFixed(2)}€ | Dépenses ce mois: ${monthExpenses.toFixed(2)}€ | Balance ce mois: ${monthBalance.toFixed(2)}€`
+
+    // Tasks summary
+    const pendingTasks = (tasks ?? []).filter(t => !t.done)
+    const overdueTasks = pendingTasks.filter(t => t.expires_at && new Date(t.expires_at) < now)
+    const taskSection = `Tâches en attente (${pendingTasks.length}): corvées=${pendingTasks.filter(t=>t.category==='chore').length}, travaux=${pendingTasks.filter(t=>t.category==='work').length}${overdueTasks.length > 0 ? ` — EN RETARD: ${overdueTasks.map(t=>t.name).join(', ')}` : ''}`
+
+    const system = `Tu es Family Agent, l'assistant IA de la famille. Tu aides avec les finances, les recettes, l'organisation, le calendrier et les tâches ménagères.
+Finances: ${financeSection}
+Budgets: ${JSON.stringify(budgets ?? [])}
+Recettes: ${JSON.stringify(recipes ?? [])}
+Courses: ${JSON.stringify(shopping ?? [])}
+Tâches: ${taskSection}${googleSection}
+Réponds dans la langue de l'utilisateur. Sois concis et utile. Pour les suggestions de budget vacances/travaux/épargne, base-toi sur la balance mensuelle réelle. N'invente pas de données.`
 
     // Call Anthropic
     const model = needsSonnet(message) ? AGENT_CONFIG.models.smart : AGENT_CONFIG.models.fast

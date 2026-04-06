@@ -35,6 +35,16 @@ const APPS = [
     color: '#7C3AED',
     bg: '#F5F3FF',
   },
+  {
+    id: 'tasks',
+    icon: '✅',
+    titleFr: 'Tâches',
+    titleEn: 'Tasks',
+    descFr: 'Corvées & travaux maison',
+    descEn: 'Chores & home projects',
+    color: '#E67E22',
+    bg: '#FFF8F0',
+  },
 ];
 
 export default function PortalPage({ onSelectApp }) {
@@ -155,7 +165,7 @@ const styles = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '16px',
   },
   card: {

@@ -10,7 +10,7 @@ export const AGENT_CONFIG = {
   // --------------------------------------------------------------------------
   finance: {
     /** Nombre de transactions récentes transmises à l'agent */
-    transactionsLimit: 10,
+    transactionsLimit: 100,
 
     /** Nombre de budgets actifs transmis à l'agent */
     budgetsLimit: 20,
@@ -32,10 +32,10 @@ export const AGENT_CONFIG = {
   // --------------------------------------------------------------------------
   calendar: {
     /** Nombre de jours à venir affichés dans l'agenda (à partir d'aujourd'hui) */
-    daysAhead: 7,
+    daysAhead: 30,
 
     /** Nombre maximum d'événements transmis à l'agent */
-    eventsLimit: 10,
+    eventsLimit: 50,
   },
 
   // --------------------------------------------------------------------------
@@ -43,7 +43,7 @@ export const AGENT_CONFIG = {
   // --------------------------------------------------------------------------
   gmail: {
     /** Nombre de messages récents transmis à l'agent (lus + non lus) */
-    messagesLimit: 10,
+    messagesLimit: 100,
   },
 
   // --------------------------------------------------------------------------

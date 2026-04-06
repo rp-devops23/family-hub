@@ -5,6 +5,7 @@ import LoginPage from './apps/finance/pages/LoginPage';
 import FinanceApp from './apps/finance/FinanceApp';
 import RecipeApp from './apps/recipes/RecipeApp';
 import AgentApp from './apps/agent/AgentApp';
+import TasksApp from './apps/tasks/TasksApp';
 import PortalPage from './portal/PortalPage';
 import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
@@ -48,6 +49,10 @@ function AppInner() {
 
   if (activeApp === 'agent') {
     return <AgentApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'tasks') {
+    return <TasksApp onHome={() => setActiveApp(null)} />;
   }
 
   return <PortalPage onSelectApp={setActiveApp} />;

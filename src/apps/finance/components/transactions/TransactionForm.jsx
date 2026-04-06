@@ -27,6 +27,7 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
   }, [transactions]);
 
   // Form state
+  const [type, setType] = useState('expense'); // 'expense' | 'income'
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
@@ -40,6 +41,7 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
   // Initialize form when editing
   useEffect(() => {
     if (transaction) {
+      setType(transaction.type || 'expense');
       setDescription(transaction.description || '');
       setAmount(String(transaction.amount || ''));
       setDate(transaction.date || '');
@@ -91,7 +93,7 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
       setError(t('Date requise', 'Date required'));
       return;
     }
-    if (!subcategoryId) {
+    if (type === 'expense' && !subcategoryId) {
       setError(t('Catégorie requise', 'Category required'));
       return;
     }
@@ -99,11 +101,12 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
     setSaving(true);
 
     const data = {
+      type,
       description: description.trim(),
       amount: Math.abs(parseFloat(amount)),
       date,
       account_id: accountId || null,
-      subcategory_id: subcategoryId,
+      subcategory_id: type === 'income' ? null : (subcategoryId || null),
       notes: notes.trim() || null,
     };
 
@@ -141,6 +144,24 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
+          {/* Type toggle */}
+          <div style={styles.typeToggle}>
+            <button
+              type="button"
+              onClick={() => setType('expense')}
+              style={{ ...styles.typeBtn, ...(type === 'expense' ? styles.typeBtnExpense : {}) }}
+            >
+              📤 {t('Dépense', 'Expense')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setType('income')}
+              style={{ ...styles.typeBtn, ...(type === 'income' ? styles.typeBtnIncome : {}) }}
+            >
+              📥 {t('Revenu', 'Income')}
+            </button>
+          </div>
+
           {/* Bénéficiaire (was Description) */}
           <div style={styles.field}>
             <label style={styles.label}>{t('Bénéficiaire', 'Beneficiary')} *</label>
@@ -202,40 +223,34 @@ export default function TransactionForm({ transaction, onClose, onSave }) {
             </select>
           </div>
 
-          {/* Category */}
-          <div style={styles.field}>
-            <label style={styles.label}>{t('Catégorie', 'Category')} *</label>
-            <select
-              value={categoryId}
-              onChange={e => setCategoryId(e.target.value)}
-              style={styles.select}
-            >
-              <option value="">{t('Choisir...', 'Select...')}</option>
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {language === 'fr' ? cat.name_fr : cat.name_en}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Subcategory */}
-          {categoryId && (
-            <div style={styles.field}>
-              <label style={styles.label}>{t('Sous-catégorie', 'Subcategory')} *</label>
-              <select
-                value={subcategoryId}
-                onChange={e => setSubcategoryId(e.target.value)}
-                style={styles.select}
-              >
-                <option value="">{t('Choisir...', 'Select...')}</option>
-                {filteredSubcategories.map(sub => (
-                  <option key={sub.id} value={sub.id}>
-                    {language === 'fr' ? sub.name_fr : sub.name_en}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Category (expense only) */}
+          {type === 'expense' && (
+            <>
+              <div style={styles.field}>
+                <label style={styles.label}>{t('Catégorie', 'Category')} *</label>
+                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} style={styles.select}>
+                  <option value="">{t('Choisir...', 'Select...')}</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {language === 'fr' ? cat.name_fr : cat.name_en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {categoryId && (
+                <div style={styles.field}>
+                  <label style={styles.label}>{t('Sous-catégorie', 'Subcategory')} *</label>
+                  <select value={subcategoryId} onChange={e => setSubcategoryId(e.target.value)} style={styles.select}>
+                    <option value="">{t('Choisir...', 'Select...')}</option>
+                    {filteredSubcategories.map(sub => (
+                      <option key={sub.id} value={sub.id}>
+                        {language === 'fr' ? sub.name_fr : sub.name_en}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           )}
 
           {/* Description (was Notes) */}
@@ -316,6 +331,32 @@ const styles = {
   },
   form: {
     padding: '20px',
+  },
+  typeToggle: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '20px',
+  },
+  typeBtn: {
+    flex: 1,
+    padding: '12px',
+    border: '2px solid #E1E8ED',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    backgroundColor: '#F5F7FA',
+    color: '#636E72',
+  },
+  typeBtnExpense: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#E74C3C',
+    color: '#E74C3C',
+  },
+  typeBtnIncome: {
+    backgroundColor: '#F0FFF4',
+    borderColor: '#27AE60',
+    color: '#27AE60',
   },
   field: {
     marginBottom: '16px',
