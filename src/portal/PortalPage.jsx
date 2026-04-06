@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 // ============================================================================
@@ -49,6 +50,13 @@ const APPS = [
 
 export default function PortalPage({ onSelectApp }) {
   const { signOut, language, toggleLanguage, t } = useAuth();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+
+  useEffect(() => {
+    const handle = () => setIsMobile(window.innerWidth < 600);
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
 
   return (
     <div style={styles.container}>
@@ -70,20 +78,27 @@ export default function PortalPage({ onSelectApp }) {
       <main style={styles.main}>
         <p style={styles.subtitle}>{t('Choisissez une application', 'Choose an app')}</p>
 
-        <div style={styles.grid}>
+        <div style={isMobile ? styles.gridMobile : styles.grid}>
           {APPS.map(app => (
             <button
               key={app.id}
               onClick={() => onSelectApp(app.id)}
-              style={{ ...styles.card, borderTop: `4px solid ${app.color}`, background: app.bg }}
+              style={isMobile
+                ? { ...styles.cardMobile, borderTop: `4px solid ${app.color}`, background: app.bg }
+                : { ...styles.card, borderTop: `4px solid ${app.color}`, background: app.bg }
+              }
             >
-              <span style={styles.appIcon}>{app.icon}</span>
-              <span style={{ ...styles.appTitle, color: app.color }}>
-                {language === 'fr' ? app.titleFr : app.titleEn}
-              </span>
-              <span style={styles.appDesc}>
-                {language === 'fr' ? app.descFr : app.descEn}
-              </span>
+              <span style={isMobile ? styles.appIconMobile : styles.appIcon}>{app.icon}</span>
+              {!isMobile && (
+                <>
+                  <span style={{ ...styles.appTitle, color: app.color }}>
+                    {language === 'fr' ? app.titleFr : app.titleEn}
+                  </span>
+                  <span style={styles.appDesc}>
+                    {language === 'fr' ? app.descFr : app.descEn}
+                  </span>
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -167,6 +182,25 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap: '16px',
+  },
+  gridMobile: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '12px',
+  },
+  cardMobile: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px 8px',
+    borderRadius: '20px',
+    border: 'none',
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  },
+  appIconMobile: {
+    fontSize: '52px',
   },
   card: {
     display: 'flex',
