@@ -262,9 +262,8 @@ export default function CalendarPage() {
 
       {showMealPicker && selectedDate && (
         <MealPicker
-          selectedDate={selectedDate}
-          onClose={() => setShowMealPicker(false)}
-          onMealAdded={handleMealAdded}
+          date={selectedDate}
+          onClose={handleMealAdded}
         />
       )}
     </div>
