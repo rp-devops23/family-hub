@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { 
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer 
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { useApp } from '../context/AppContext';
 
@@ -68,17 +68,24 @@ export default function HomePage() {
       const d = new Date(thisYear, thisMonth - i, 1);
       const month = d.getMonth();
       const year = d.getFullYear();
-      
-      const total = transactions
-        .filter(tx => {
-          const txDate = new Date(tx.date);
-          return txDate.getMonth() === month && txDate.getFullYear() === year;
-        })
+
+      const monthTx = transactions.filter(tx => {
+        const txDate = new Date(tx.date);
+        return txDate.getMonth() === month && txDate.getFullYear() === year;
+      });
+
+      const expenses = monthTx
+        .filter(tx => !tx.type || tx.type === 'expense')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      const income = monthTx
+        .filter(tx => tx.type === 'income')
         .reduce((sum, tx) => sum + tx.amount, 0);
 
       months.push({
         name: monthNames[month],
-        total: Math.round(total),
+        [t('Revenus', 'Income')]: Math.round(income),
+        [t('Dépenses', 'Expenses')]: Math.round(expenses),
+        [t('Balance', 'Balance')]: Math.round(income - expenses),
       });
     }
     return months;
@@ -259,41 +266,53 @@ export default function HomePage() {
 
       {/* Spending Trend */}
       <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>📈 {t('Tendance des dépenses', 'Spending trend')}</h2>
+        <h2 style={styles.sectionTitle}>📈 {t('Tendance financière', 'Financial trend')}</h2>
         <div style={styles.chartCard}>
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00A3E0" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#00A3E0" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis 
-                dataKey="name" 
-                axisLine={false} 
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <XAxis
+                dataKey="name"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: '#636E72' }}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: '#636E72' }}
                 tickFormatter={v => `${(v/1000).toFixed(0)}k`}
               />
-              <Tooltip 
-                formatter={(value) => [`€${value}`, t('Total', 'Total')]}
+              <Tooltip
+                formatter={(value) => [`€${value}`]}
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="total" 
-                stroke="#00A3E0" 
+              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+              <Line
+                type="monotone"
+                dataKey={t('Revenus', 'Income')}
+                stroke="#00B894"
                 strokeWidth={2}
-                fillOpacity={1} 
-                fill="url(#colorTotal)" 
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
               />
-            </AreaChart>
+              <Line
+                type="monotone"
+                dataKey={t('Dépenses', 'Expenses')}
+                stroke="#E74C3C"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey={t('Balance', 'Balance')}
+                stroke="#00A3E0"
+                strokeWidth={2}
+                strokeDasharray="4 2"
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
