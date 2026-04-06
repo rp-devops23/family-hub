@@ -33,6 +33,7 @@ export default function InsightsPage() {
   const [yearsToCompare, setYearsToCompare] = useState(2);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [chartType, setChartType] = useState('bar');
+  const [metricType, setMetricType] = useState('expenses'); // 'expenses' | 'income' | 'balance'
 
   // Account selector — default to "Commun"
   const communAccount = useMemo(
@@ -50,6 +51,15 @@ export default function InsightsPage() {
   const monthNamesShort = language === 'fr'
     ? ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
     : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Helper: compute metric value from a list of transactions
+  const computeMetric = (txList, metric) => {
+    const income = txList.filter(tx => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
+    const expenses = txList.filter(tx => !tx.type || tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
+    if (metric === 'income') return income;
+    if (metric === 'balance') return income - expenses;
+    return expenses;
+  };
 
   // ============================================================================
   // AVAILABLE YEARS
@@ -203,19 +213,17 @@ export default function InsightsPage() {
     const data = monthNamesShort.map((name, monthIndex) => {
       const point = { name };
       years.forEach(year => {
-        const monthTotal = filteredTransactions
-          .filter(tx => {
-            const d = new Date(tx.date);
-            return d.getFullYear() === year && d.getMonth() === monthIndex;
-          })
-          .reduce((sum, tx) => sum + tx.amount, 0);
-        point[year] = Math.round(monthTotal);
+        const monthTx = filteredTransactions.filter(tx => {
+          const d = new Date(tx.date);
+          return d.getFullYear() === year && d.getMonth() === monthIndex;
+        });
+        point[year] = Math.round(computeMetric(monthTx, metricType));
       });
       return point;
     });
 
     return { data, years };
-  }, [viewMode, filteredTransactions, selectedYear, yearsToCompare, monthNamesShort]);
+  }, [viewMode, filteredTransactions, selectedYear, yearsToCompare, monthNamesShort, metricType]);
 
   // ============================================================================
   // MONTHLY VIEW: Same month comparison across years
@@ -277,21 +285,19 @@ export default function InsightsPage() {
       const year = selectedYear - i;
       if (!availableYears.includes(year)) continue;
       
-      const total = filteredTransactions
-        .filter(tx => {
-          const d = new Date(tx.date);
-          return d.getFullYear() === year && d.getMonth() === selectedMonth;
-        })
-        .reduce((sum, tx) => sum + tx.amount, 0);
-      
+      const monthTx = filteredTransactions.filter(tx => {
+        const d = new Date(tx.date);
+        return d.getFullYear() === year && d.getMonth() === selectedMonth;
+      });
+
       data.push({
         name: String(year),
-        total: Math.round(total),
+        total: Math.round(computeMetric(monthTx, metricType)),
         fill: YEAR_COLORS[yearsToCompare - 1 - i] || COLORS[i % COLORS.length],
       });
     }
     return data;
-  }, [viewMode, filteredTransactions, selectedYear, selectedMonth, yearsToCompare, availableYears]);
+  }, [viewMode, filteredTransactions, selectedYear, selectedMonth, yearsToCompare, availableYears, metricType]);
 
   // ============================================================================
   // NAVIGATION HELPERS
@@ -458,6 +464,28 @@ export default function InsightsPage() {
             ▶
           </button>
         </div>
+      </div>
+
+      {/* Metric toggle */}
+      <div style={styles.metricRow}>
+        {[
+          { key: 'expenses', labelFr: 'Dépenses', labelEn: 'Expenses', color: '#E74C3C' },
+          { key: 'income',   labelFr: 'Revenus',  labelEn: 'Income',   color: '#00B894' },
+          { key: 'balance',  labelFr: 'Balance',  labelEn: 'Balance',  color: '#00A3E0' },
+        ].map(m => (
+          <button
+            key={m.key}
+            onClick={() => setMetricType(m.key)}
+            style={{
+              ...styles.metricBtn,
+              backgroundColor: metricType === m.key ? m.color : 'white',
+              color: metricType === m.key ? 'white' : m.color,
+              borderColor: m.color,
+            }}
+          >
+            {t(m.labelFr, m.labelEn)}
+          </button>
+        ))}
       </div>
 
       {/* Tabs */}
@@ -766,6 +794,21 @@ const styles = {
     border: '2px solid',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.15s',
+  },
+  metricRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  metricBtn: {
+    flex: 1,
+    padding: '7px 4px',
+    borderRadius: '20px',
+    border: '2px solid',
+    cursor: 'pointer',
+    fontSize: '13px',
     fontWeight: '600',
     transition: 'all 0.15s',
   },
