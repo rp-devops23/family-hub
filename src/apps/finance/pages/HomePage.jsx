@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
@@ -12,8 +12,8 @@ import { useApp } from '../context/AppContext';
 const CHART_COLORS = ['#00A3E0', '#003D5B', '#E67E22', '#00B894', '#9B59B6', '#E74C3C', '#F39C12', '#1ABC9C'];
 
 export default function HomePage() {
-  const { 
-    t, language, transactions, categories, subcategories, budgets,
+  const {
+    t, language, transactions, categories, subcategories, budgets, accounts,
     formatAmount, formatDate, getSubcategory, getCategoryForSubcategory, getAccount
   } = useApp();
 
@@ -21,27 +21,42 @@ export default function HomePage() {
   const thisMonth = today.getMonth();
   const thisYear = today.getFullYear();
 
+  // Default to "Commun" account; fall back to first account if not found yet
+  const communAccount = useMemo(
+    () => accounts.find(a => a.name.toLowerCase() === 'commun') || accounts[0],
+    [accounts]
+  );
+  const [selectedAccountId, setSelectedAccountId] = useState(null);
+  // Resolve: null means "use communAccount once loaded"
+  const activeAccountId = selectedAccountId ?? communAccount?.id ?? null;
+
+  // Filter transactions by selected account
+  const accountTx = useMemo(
+    () => activeAccountId ? transactions.filter(tx => tx.account_id === activeAccountId) : transactions,
+    [transactions, activeAccountId]
+  );
+
   // ============================================================================
   // CALCULATIONS
   // ============================================================================
 
   // This month's transactions
   const thisMonthTx = useMemo(() => {
-    return transactions.filter(tx => {
+    return accountTx.filter(tx => {
       const d = new Date(tx.date);
       return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     });
-  }, [transactions, thisMonth, thisYear]);
+  }, [accountTx, thisMonth, thisYear]);
 
   // Last month's transactions
   const lastMonthTx = useMemo(() => {
     const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
     const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
-    return transactions.filter(tx => {
+    return accountTx.filter(tx => {
       const d = new Date(tx.date);
       return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
     });
-  }, [transactions, thisMonth, thisYear]);
+  }, [accountTx, thisMonth, thisYear]);
 
   // KPI values
   const thisMonthTotal = thisMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
@@ -69,7 +84,7 @@ export default function HomePage() {
       const month = d.getMonth();
       const year = d.getFullYear();
 
-      const monthTx = transactions.filter(tx => {
+      const monthTx = accountTx.filter(tx => {
         const txDate = new Date(tx.date);
         return txDate.getMonth() === month && txDate.getFullYear() === year;
       });
@@ -89,7 +104,7 @@ export default function HomePage() {
       });
     }
     return months;
-  }, [transactions, thisMonth, thisYear, language]);
+  }, [accountTx, thisMonth, thisYear, language]);
 
   // ============================================================================
   // CATEGORY BREAKDOWN (this month)
@@ -125,10 +140,10 @@ export default function HomePage() {
   // RECENT TRANSACTIONS
   // ============================================================================
   const recentTransactions = useMemo(() => {
-    return [...transactions]
+    return [...accountTx]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
-  }, [transactions]);
+  }, [accountTx]);
 
   // ============================================================================
   // BUDGET ALERTS
@@ -186,6 +201,26 @@ export default function HomePage() {
           {t('Voici votre résumé financier', 'Here\'s your financial summary')}
         </p>
       </div>
+
+      {/* Account selector */}
+      {accounts.length > 1 && (
+        <div style={styles.accountRow}>
+          {accounts.map(account => (
+            <button
+              key={account.id}
+              onClick={() => setSelectedAccountId(account.id)}
+              style={{
+                ...styles.accountBtn,
+                backgroundColor: activeAccountId === account.id ? account.color : 'white',
+                color: activeAccountId === account.id ? 'white' : account.color,
+                borderColor: account.color,
+              }}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div style={styles.kpiGrid}>
@@ -421,6 +456,20 @@ const styles = {
     fontSize: '14px',
     color: '#636E72',
     marginTop: '4px',
+  },
+  accountRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  accountBtn: {
+    padding: '6px 18px',
+    borderRadius: '20px',
+    border: '2px solid',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.15s',
   },
   kpiGrid: {
     display: 'grid',
