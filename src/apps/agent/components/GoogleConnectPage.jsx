@@ -109,14 +109,17 @@ export default function GoogleConnectPage({ onBack }) {
             {googleEmail && <p style={styles.email}>{googleEmail}</p>}
             <p style={styles.info}>
               {t(
-                "L'agent IA a accès à ton agenda Google et tes emails non lus pour mieux t'aider.",
-                "The AI agent has access to your Google Calendar and unread emails to assist you better."
+                "L'agent IA a accès à ton agenda Google et tes emails récents pour mieux t'aider.",
+                "The AI agent has access to your Google Calendar and recent emails to assist you better."
               )}
             </p>
             <div style={styles.scopeList}>
               <div style={styles.scopeItem}>📅 {t('Google Calendar (lecture seule)', 'Google Calendar (read-only)')}</div>
               <div style={styles.scopeItem}>📧 {t('Gmail (lecture seule)', 'Gmail (read-only)')}</div>
             </div>
+            <button onClick={handleConnect} disabled={working} style={styles.switchBtn}>
+              {working ? t('Redirection…', 'Redirecting…') : t('Changer de compte Google', 'Switch Google account')}
+            </button>
             <button onClick={handleDisconnect} disabled={working} style={styles.disconnectBtn}>
               {working ? t('Déconnexion…', 'Disconnecting…') : t('Déconnecter', 'Disconnect')}
             </button>
@@ -245,6 +248,17 @@ const styles = {
     borderRadius: '10px',
     fontSize: '15px',
     fontWeight: '600',
+    cursor: 'pointer',
+  },
+  switchBtn: {
+    width: '100%',
+    padding: '12px',
+    backgroundColor: 'white',
+    color: '#7C3AED',
+    border: '1px solid #E9D5FF',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '500',
     cursor: 'pointer',
   },
   disconnectBtn: {

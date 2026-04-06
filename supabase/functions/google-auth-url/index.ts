@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       response_type: 'code',
       scope: scopes,
       access_type: 'offline',   // ensures we get a refresh_token
-      prompt: 'consent',         // forces refresh_token even if previously granted
+      prompt: 'select_account consent', // forces account picker + refresh_token
       state,
     })
 
