@@ -40,6 +40,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
     : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   // Form state
+  const [type, setType] = useState('expense'); // 'expense' | 'income'
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState('monthly');
@@ -70,6 +71,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
   // Initialize form when editing
   useEffect(() => {
     if (template) {
+      setType(template.type || 'expense');
       setDescription(template.description || '');
       setAmount(String(template.amount || ''));
       setFrequency(template.frequency || 'monthly');
@@ -122,7 +124,7 @@ export default function RecurringForm({ template, onClose, onSave }) {
       setError(t('Montant invalide', 'Invalid amount'));
       return;
     }
-    if (!selectedSubcategory) {
+    if (type === 'expense' && !selectedSubcategory) {
       setError(t('Sous-catégorie requise', 'Subcategory required'));
       return;
     }
@@ -140,12 +142,13 @@ export default function RecurringForm({ template, onClose, onSave }) {
     }
 
     const data = {
+      type,
       description: description.trim(),
       amount: parseFloat(amount),
       frequency,
       day_of_month: frequency === 'monthly' || frequency === 'trimestrial' || frequency === 'yearly' ? parseInt(dayOfMonth) : null,
       day_of_week: frequency === 'weekly' || frequency === 'biweekly' ? parseInt(dayOfWeek) : null,
-      subcategory_id: selectedSubcategory,
+      subcategory_id: type === 'income' ? null : (selectedSubcategory || null),
       account_id: selectedAccount || null,
       start_date: computedStartDate,
       end_date: endDate || null,
@@ -189,6 +192,24 @@ export default function RecurringForm({ template, onClose, onSave }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} style={styles.form}>
+          {/* Type toggle */}
+          <div style={styles.typeToggle}>
+            <button
+              type="button"
+              onClick={() => setType('expense')}
+              style={{ ...styles.typeBtn, ...(type === 'expense' ? styles.typeBtnExpense : {}) }}
+            >
+              📤 {t('Dépense', 'Expense')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setType('income')}
+              style={{ ...styles.typeBtn, ...(type === 'income' ? styles.typeBtnIncome : {}) }}
+            >
+              📥 {t('Revenu', 'Income')}
+            </button>
+          </div>
+
           {/* Bénéficiaire (was Description) */}
           <div style={styles.field}>
             <label style={styles.label}>{t('Bénéficiaire', 'Beneficiary')} *</label>
@@ -306,39 +327,33 @@ export default function RecurringForm({ template, onClose, onSave }) {
             </div>
           )}
 
-          {/* Category */}
-          <div style={styles.field}>
-            <label style={styles.label}>{t('Catégorie', 'Category')} *</label>
-            <select
-              value={selectedCategory}
-              onChange={e => handleCategoryChange(e.target.value)}
-              style={styles.select}
-            >
-              <option value="">{t('Choisir...', 'Select...')}</option>
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {language === 'fr' ? cat.name_fr : cat.name_en}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Subcategory */}
-          <div style={styles.field}>
-            <label style={styles.label}>{t('Sous-catégorie', 'Subcategory')} *</label>
-            <select
-              value={selectedSubcategory}
-              onChange={e => setSelectedSubcategory(e.target.value)}
-              style={styles.select}
-            >
-              <option value="">{t('Choisir...', 'Select...')}</option>
-              {filteredSubcategories.map(sub => (
-                <option key={sub.id} value={sub.id}>
-                  {language === 'fr' ? sub.name_fr : sub.name_en}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Category + Subcategory (expense only) */}
+          {type === 'expense' && (
+            <>
+              <div style={styles.field}>
+                <label style={styles.label}>{t('Catégorie', 'Category')} *</label>
+                <select value={selectedCategory} onChange={e => handleCategoryChange(e.target.value)} style={styles.select}>
+                  <option value="">{t('Choisir...', 'Select...')}</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {language === 'fr' ? cat.name_fr : cat.name_en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>{t('Sous-catégorie', 'Subcategory')} *</label>
+                <select value={selectedSubcategory} onChange={e => setSelectedSubcategory(e.target.value)} style={styles.select}>
+                  <option value="">{t('Choisir...', 'Select...')}</option>
+                  {filteredSubcategories.map(sub => (
+                    <option key={sub.id} value={sub.id}>
+                      {language === 'fr' ? sub.name_fr : sub.name_en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Account */}
           <div style={styles.field}>
@@ -485,6 +500,32 @@ const styles = {
   },
   form: {
     padding: '20px',
+  },
+  typeToggle: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '20px',
+  },
+  typeBtn: {
+    flex: 1,
+    padding: '12px',
+    border: '2px solid #E1E8ED',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    backgroundColor: '#F5F7FA',
+    color: '#636E72',
+  },
+  typeBtnExpense: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#E74C3C',
+    color: '#E74C3C',
+  },
+  typeBtnIncome: {
+    backgroundColor: '#F0FFF4',
+    borderColor: '#27AE60',
+    color: '#27AE60',
   },
   field: {
     marginBottom: '16px',

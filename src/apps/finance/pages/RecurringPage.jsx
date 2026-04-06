@@ -168,6 +168,7 @@ export default function RecurringPage() {
     setGeneratingId(template._occurrenceKey || template.id);
     
     await addTransaction({
+      type: template.type || 'expense',
       description: template.description,
       amount: template.amount,
       date: template.expectedDate,
@@ -253,28 +254,31 @@ export default function RecurringPage() {
           </h2>
           <div style={styles.pendingList}>
             {pendingTransactions.map(template => {
+              const isIncome = template.type === 'income';
               const category = getCategoryForSubcategory(template.subcategory_id);
               const subcategory = getSubcategory(template.subcategory_id);
               const occKey = template._occurrenceKey;
-              
+
               return (
                 <div key={occKey} style={styles.pendingCard}>
                   <div style={styles.pendingLeft}>
                     <div style={{
                       ...styles.pendingDot,
-                      backgroundColor: category?.color || '#00A3E0'
+                      backgroundColor: isIncome ? '#27AE60' : (category?.color || '#00A3E0')
                     }} />
                     <div>
                       <span style={styles.pendingDesc}>{template.description}</span>
                       <span style={styles.pendingMeta}>
-                        {language === 'fr' ? subcategory?.name_fr : subcategory?.name_en}
+                        {isIncome ? t('💰 Revenu', '💰 Income') : (language === 'fr' ? subcategory?.name_fr : subcategory?.name_en)}
                         {' • '}
                         {formatDate(template.expectedDate)}
                       </span>
                     </div>
                   </div>
                   <div style={styles.pendingRight}>
-                    <span style={styles.pendingAmount}>{formatAmount(template.amount)}</span>
+                    <span style={{ ...styles.pendingAmount, color: isIncome ? '#27AE60' : '#2D3436' }}>
+                      {isIncome ? '+' : ''}{formatAmount(template.amount)}
+                    </span>
                     <button
                       onClick={() => handleDecline(template)}
                       style={styles.declineBtn}
@@ -322,29 +326,32 @@ export default function RecurringPage() {
         ) : (
           <div style={styles.list}>
             {activeTemplates.map(template => {
+              const isIncome = template.type === 'income';
               const category = getCategoryForSubcategory(template.subcategory_id);
               const subcategory = getSubcategory(template.subcategory_id);
               const account = getAccount(template.account_id);
-              
+
               return (
                 <div key={template.id} style={styles.card}>
                   <div style={styles.cardHeader}>
                     <div style={styles.cardLeft}>
                       <div style={{
                         ...styles.cardIcon,
-                        backgroundColor: category?.color || '#00A3E0'
+                        backgroundColor: isIncome ? '#27AE60' : (category?.color || '#00A3E0')
                       }}>
-                        🔄
+                        {isIncome ? '📥' : '🔄'}
                       </div>
                       <div>
                         <span style={styles.cardName}>{template.description}</span>
                         <span style={styles.cardMeta}>
-                          {language === 'fr' ? subcategory?.name_fr : subcategory?.name_en}
+                          {isIncome ? t('Revenu', 'Income') : (language === 'fr' ? subcategory?.name_fr : subcategory?.name_en)}
                           {account && ` • ${account.name}`}
                         </span>
                       </div>
                     </div>
-                    <span style={styles.cardAmount}>{formatAmount(template.amount)}</span>
+                    <span style={{ ...styles.cardAmount, color: isIncome ? '#27AE60' : '#2D3436' }}>
+                      {isIncome ? '+' : ''}{formatAmount(template.amount)}
+                    </span>
                   </div>
                   
                   <div style={styles.cardDetails}>
