@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { AGENT_CONFIG } from "./agent_config.ts"
 
 export interface GoogleTokenRow {
   access_token: string
@@ -67,10 +68,11 @@ export async function getValidAccessToken(userId: string): Promise<string | null
  * Fetch upcoming Google Calendar events (next 7 days).
  */
 export async function fetchCalendarEvents(accessToken: string): Promise<string> {
+  const { daysAhead, eventsLimit } = AGENT_CONFIG.calendar
   const now = new Date().toISOString()
-  const week = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  const end = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString()
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now)}&timeMax=${encodeURIComponent(week)}&singleEvents=true&orderBy=startTime&maxResults=10`
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now)}&timeMax=${encodeURIComponent(end)}&singleEvents=true&orderBy=startTime&maxResults=${eventsLimit}`
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
   if (!res.ok) return ''
@@ -87,8 +89,9 @@ export async function fetchCalendarEvents(accessToken: string): Promise<string> 
  * Fetch the 10 most recent Gmail messages (read and unread), with unread indicator.
  */
 export async function fetchGmailSummary(accessToken: string): Promise<string> {
+  const { messagesLimit } = AGENT_CONFIG.gmail
   const listRes = await fetch(
-    'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10',
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${messagesLimit}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!listRes.ok) return ''
@@ -96,7 +99,7 @@ export async function fetchGmailSummary(accessToken: string): Promise<string> {
   const list = await listRes.json()
   const messages: string[] = []
 
-  for (const msg of (list.messages ?? []).slice(0, 10)) {
+  for (const msg of (list.messages ?? []).slice(0, messagesLimit)) {
     const detailRes = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
       { headers: { Authorization: `Bearer ${accessToken}` } }

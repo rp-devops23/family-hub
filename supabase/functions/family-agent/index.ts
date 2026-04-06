@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { getValidAccessToken, fetchCalendarEvents, fetchGmailSummary } from "../_shared/google_refresh.ts"
+import { AGENT_CONFIG } from "../_shared/agent_config.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,8 +8,8 @@ const corsHeaders = {
 }
 
 function needsSonnet(message: string): boolean {
-  const keywords = ['analyse', 'analyze', 'compare', 'tendance', 'trend', 'prevision', 'forecast', 'explique', 'explain', 'pourquoi', 'why', 'strategie', 'strategy']
-  return keywords.some(k => message.toLowerCase().includes(k)) || message.length > 300
+  const { smartKeywords, smartMinLength } = AGENT_CONFIG.models
+  return smartKeywords.some(k => message.toLowerCase().includes(k)) || message.length > smartMinLength
 }
 
 Deno.serve(async (req) => {
@@ -61,7 +62,7 @@ Deno.serve(async (req) => {
     if (msgErr) { console.error('Msg error:', msgErr.message); return ok({ error: 'DB: ' + msgErr.message }) }
 
     // Load history
-    const { data: history } = await db.from('agent_messages').select('role, content').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(40)
+    const { data: history } = await db.from('agent_messages').select('role, content').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(AGENT_CONFIG.conversation.historyLimit)
     const messages = history?.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })) ?? [{ role: 'user' as const, content: message }]
 
     // Load app context + Google context in parallel
@@ -69,10 +70,10 @@ Deno.serve(async (req) => {
       { data: tx }, { data: budgets }, { data: recipes }, { data: shopping },
       googleAccessToken
     ] = await Promise.all([
-      db.from('transactions').select('date, amount, description').eq('user_id', user.id).order('date', { ascending: false }).limit(10),
-      db.from('budgets').select('name, amount_limit, period').eq('user_id', user.id).eq('is_active', true),
-      db.from('recipes').select('name, meal_type').eq('user_id', user.id).limit(15),
-      db.from('shopping_items').select('name, quantity, unit').eq('user_id', user.id).eq('checked', false).limit(20),
+      db.from('transactions').select('date, amount, description').eq('user_id', user.id).order('date', { ascending: false }).limit(AGENT_CONFIG.finance.transactionsLimit),
+      db.from('budgets').select('name, amount_limit, period').eq('user_id', user.id).eq('is_active', true).limit(AGENT_CONFIG.finance.budgetsLimit),
+      db.from('recipes').select('name, meal_type').eq('user_id', user.id).limit(AGENT_CONFIG.recipes.recipesLimit),
+      db.from('shopping_items').select('name, quantity, unit').eq('user_id', user.id).eq('checked', false).limit(AGENT_CONFIG.recipes.shoppingItemsLimit),
       getValidAccessToken(user.id),
     ])
 
@@ -97,11 +98,11 @@ Données app : transactions=${JSON.stringify(tx ?? [])}, budgets=${JSON.stringif
 Réponds dans la langue de l'utilisateur. Sois concis et utile. N'invente pas de données.`
 
     // Call Anthropic
-    const model = needsSonnet(message) ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
+    const model = needsSonnet(message) ? AGENT_CONFIG.models.smart : AGENT_CONFIG.models.fast
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model, max_tokens: 1024, system, messages }),
+      body: JSON.stringify({ model, max_tokens: AGENT_CONFIG.models.maxTokens, system, messages }),
     })
 
     if (!res.ok) {
