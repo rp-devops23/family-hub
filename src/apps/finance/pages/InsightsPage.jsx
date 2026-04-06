@@ -31,9 +31,16 @@ export default function InsightsPage() {
   
   // Settings
   const [yearsToCompare, setYearsToCompare] = useState(2);
-  const [selectedAccount, setSelectedAccount] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [chartType, setChartType] = useState('bar');
+
+  // Account selector — default to "Commun"
+  const communAccount = useMemo(
+    () => accounts.find(a => a.name.toLowerCase() === 'commun') || accounts[0],
+    [accounts]
+  );
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const effectiveAccount = selectedAccount ?? communAccount?.id ?? 'all';
 
   // Month names
   const monthNames = language === 'fr'
@@ -60,14 +67,14 @@ export default function InsightsPage() {
   // ============================================================================
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      if (selectedAccount !== 'all' && tx.account_id !== selectedAccount) return false;
+      if (effectiveAccount !== 'all' && tx.account_id !== effectiveAccount) return false;
       if (selectedCategory !== 'all') {
         const sub = subcategories.find(s => s.id === tx.subcategory_id);
         if (!sub || sub.category_id !== selectedCategory) return false;
       }
       return true;
     });
-  }, [transactions, selectedAccount, selectedCategory, subcategories]);
+  }, [transactions, effectiveAccount, selectedCategory, subcategories]);
 
   // ============================================================================
   // CURRENT PERIOD TRANSACTIONS
@@ -328,6 +335,26 @@ export default function InsightsPage() {
         </button>
       </div>
 
+      {/* Account selector */}
+      {accounts.length > 1 && (
+        <div style={styles.accountRow}>
+          {accounts.map(account => (
+            <button
+              key={account.id}
+              onClick={() => setSelectedAccount(account.id)}
+              style={{
+                ...styles.accountBtn,
+                backgroundColor: effectiveAccount === account.id ? account.color : 'white',
+                color: effectiveAccount === account.id ? 'white' : account.color,
+                borderColor: account.color,
+              }}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* View Mode Toggle */}
       <div style={styles.viewModeToggle}>
         <button
@@ -396,19 +423,6 @@ export default function InsightsPage() {
             </div>
           </div>
 
-          <div style={styles.settingRow}>
-            <span style={styles.settingLabel}>{t('Compte', 'Account')}</span>
-            <select
-              value={selectedAccount}
-              onChange={e => setSelectedAccount(e.target.value)}
-              style={styles.select}
-            >
-              <option value="all">{t('Tous', 'All')}</option>
-              {accounts.map(acc => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
       )}
 
@@ -740,6 +754,20 @@ export default function InsightsPage() {
 const styles = {
   container: {
     padding: '20px 16px 100px',
+  },
+  accountRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  accountBtn: {
+    padding: '6px 18px',
+    borderRadius: '20px',
+    border: '2px solid',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.15s',
   },
   headerRow: {
     display: 'flex',
