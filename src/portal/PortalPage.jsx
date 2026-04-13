@@ -37,14 +37,24 @@ const APPS = [
     bg: '#F5F3FF',
   },
   {
-    id: 'tasks',
-    icon: '✅',
-    titleFr: 'Tâches',
-    titleEn: 'Tasks',
-    descFr: 'Corvées & travaux maison',
-    descEn: 'Chores & home projects',
-    color: '#E67E22',
-    bg: '#FFF8F0',
+    id: 'corvees',
+    icon: '🧹',
+    titleFr: 'Corvées',
+    titleEn: 'Chores',
+    descFr: 'Tâches ménagères',
+    descEn: 'Household chores',
+    color: '#27AE60',
+    bg: '#F0FFF4',
+  },
+  {
+    id: 'travaux',
+    icon: '🔨',
+    titleFr: 'Travaux',
+    titleEn: 'Home Work',
+    descFr: 'Projets & rénovations',
+    descEn: 'Projects & renovations',
+    color: '#8E44AD',
+    bg: '#F5F0FF',
   },
 ];
 
@@ -79,28 +89,32 @@ export default function PortalPage({ onSelectApp }) {
         <p style={styles.subtitle}>{t('Choisissez une application', 'Choose an app')}</p>
 
         <div style={isMobile ? styles.gridMobile : styles.grid}>
-          {APPS.map(app => (
-            <button
-              key={app.id}
-              onClick={() => onSelectApp(app.id)}
-              style={isMobile
-                ? { ...styles.cardMobile, borderTop: `4px solid ${app.color}`, background: app.bg }
-                : { ...styles.card, borderTop: `4px solid ${app.color}`, background: app.bg }
-              }
-            >
-              <span style={isMobile ? styles.appIconMobile : styles.appIcon}>{app.icon}</span>
-              {!isMobile && (
-                <>
-                  <span style={{ ...styles.appTitle, color: app.color }}>
-                    {language === 'fr' ? app.titleFr : app.titleEn}
-                  </span>
-                  <span style={styles.appDesc}>
-                    {language === 'fr' ? app.descFr : app.descEn}
-                  </span>
-                </>
-              )}
-            </button>
-          ))}
+          {APPS.map((app, i) => {
+            const isLast = i === APPS.length - 1 && APPS.length % 2 !== 0;
+            const extraStyle = isLast ? { gridColumn: '1 / -1', justifySelf: 'center', width: 'calc(50% - 8px)' } : {};
+            return (
+              <button
+                key={app.id}
+                onClick={() => onSelectApp(app.id)}
+                style={isMobile
+                  ? { ...styles.cardMobile, ...extraStyle, borderTop: `4px solid ${app.color}`, background: app.bg }
+                  : { ...styles.card, ...extraStyle, borderTop: `4px solid ${app.color}`, background: app.bg }
+                }
+              >
+                <span style={isMobile ? styles.appIconMobile : styles.appIcon}>{app.icon}</span>
+                {!isMobile && (
+                  <>
+                    <span style={{ ...styles.appTitle, color: app.color }}>
+                      {language === 'fr' ? app.titleFr : app.titleEn}
+                    </span>
+                    <span style={styles.appDesc}>
+                      {language === 'fr' ? app.descFr : app.descEn}
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
         </div>
       </main>
     </div>

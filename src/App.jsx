@@ -5,7 +5,8 @@ import LoginPage from './apps/finance/pages/LoginPage';
 import FinanceApp from './apps/finance/FinanceApp';
 import RecipeApp from './apps/recipes/RecipeApp';
 import AgentApp from './apps/agent/AgentApp';
-import TasksApp from './apps/tasks/TasksApp';
+import CorveesApp from './apps/corvees/CorveesApp';
+import TravauxApp from './apps/travaux/TravauxApp';
 import PortalPage from './portal/PortalPage';
 import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
@@ -51,8 +52,12 @@ function AppInner() {
     return <AgentApp onHome={() => setActiveApp(null)} />;
   }
 
-  if (activeApp === 'tasks') {
-    return <TasksApp onHome={() => setActiveApp(null)} />;
+  if (activeApp === 'corvees') {
+    return <CorveesApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'travaux') {
+    return <TravauxApp onHome={() => setActiveApp(null)} />;
   }
 
   return <PortalPage onSelectApp={setActiveApp} />;
