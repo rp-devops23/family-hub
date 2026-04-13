@@ -56,6 +56,16 @@ const APPS = [
     color: '#8E44AD',
     bg: '#F5F0FF',
   },
+  {
+    id: 'shopping',
+    icon: '🛍️',
+    titleFr: 'Shopping',
+    titleEn: 'Shopping',
+    descFr: 'Courses & cadeaux',
+    descEn: 'Grocery & gifts',
+    color: '#E74C3C',
+    bg: '#FFF5F5',
+  },
 ];
 
 export default function PortalPage({ onSelectApp }) {
