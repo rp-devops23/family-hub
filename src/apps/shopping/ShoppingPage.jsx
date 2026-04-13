@@ -3,14 +3,17 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 // ============================================================================
-// SHOPPING PAGE — Courses & Cadeaux
+// SHOPPING PAGE — À acheter (vêtements/accessoires) & Cadeaux
 // ============================================================================
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 const ACCENT = '#E74C3C';
 
-const AISLES_FR = ['Alimentation', 'Boissons', 'Maison', 'Pharmacie', 'Beauté', 'Animaux', 'Autre'];
-const AISLES_EN = ['Food', 'Drinks', 'Home', 'Pharmacy', 'Beauty', 'Pets', 'Other'];
+const ITEM_TYPES_FR = ['T-shirt', 'Haut', 'Pull', 'Sweat', 'Veste', 'Manteau', 'Pantalon', 'Jean', 'Short', 'Costume', 'Robe', 'Jupe', 'Chaussures', 'Baskets', 'Bottes', 'Accessoire', 'Sous-vêtements', 'Sport', 'Autre'];
+const ITEM_TYPES_EN = ['T-shirt', 'Top', 'Sweater', 'Sweatshirt', 'Jacket', 'Coat', 'Pants', 'Jeans', 'Shorts', 'Suit', 'Dress', 'Skirt', 'Shoes', 'Sneakers', 'Boots', 'Accessory', 'Underwear', 'Sport', 'Other'];
+
+const OCCASIONS_FR = ['Anniversaire', 'Noël', 'Fête des Mères', 'Fête des Pères', 'Naissance', 'Saint-Valentin', 'Mariage', 'Autre'];
+const OCCASIONS_EN = ['Birthday', 'Christmas', "Mother's Day", "Father's Day", 'Birth', "Valentine's Day", 'Wedding', 'Other'];
 
 function fmtEur(n) {
   if (n == null) return '';
@@ -24,22 +27,22 @@ function daysUntil(d) {
 
 export default function ShoppingPage({ onHome }) {
   const { user, language, toggleLanguage, signOut, t } = useAuth();
-  const [tab, setTab] = useState('groceries'); // 'groceries' | 'gift'
+  const [tab, setTab] = useState('clothing');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
-  // Groceries form
-  const [formName, setFormName]         = useState('');
-  const [formQty, setFormQty]           = useState('');
-  const [formAisle, setFormAisle]       = useState('');
+  // Clothing form
+  const [formName, setFormName]           = useState('');
+  const [formItemType, setFormItemType]   = useState('');
+  const [formForWhom, setFormForWhom]     = useState('');
+  const [formDescription, setFormDescription] = useState('');
   // Gift form
-  const [formForWhom, setFormForWhom]   = useState('');
-  const [formDeadline, setFormDeadline] = useState('');
-  const [formBudget, setFormBudget]     = useState('');
-  const [formLink, setFormLink]         = useState('');
-  const [formSaving, setFormSaving]     = useState(false);
+  const [formOccasion, setFormOccasion]   = useState('');
+  const [formDeadline, setFormDeadline]   = useState('');
+  const [formBudget, setFormBudget]       = useState('');
+  const [formSaving, setFormSaving]       = useState(false);
 
   useEffect(() => { if (user) load(); }, [user]);
 
@@ -67,14 +70,10 @@ export default function ShoppingPage({ onHome }) {
   async function save() {
     if (!formName.trim()) return;
     setFormSaving(true);
-    const base = {
-      name: formName.trim(),
-      category: tab,
-      updated_at: new Date().toISOString(),
-    };
-    const payload = tab === 'groceries'
-      ? { ...base, aisle: formAisle || null, quantity: formQty.trim() || null, for_whom: null, deadline: null, budget: null, link: null }
-      : { ...base, for_whom: formForWhom.trim() || null, deadline: formDeadline || null, budget: formBudget !== '' ? parseFloat(formBudget) : null, link: formLink.trim() || null, aisle: null, quantity: null };
+    const base = { name: formName.trim(), category: tab, updated_at: new Date().toISOString() };
+    const payload = tab === 'clothing'
+      ? { ...base, item_type: formItemType || null, for_whom: formForWhom.trim() || null, description: formDescription.trim() || null, occasion: null, deadline: null, budget: null }
+      : { ...base, occasion: formOccasion || null, for_whom: formForWhom.trim() || null, deadline: formDeadline || null, budget: formBudget !== '' ? parseFloat(formBudget) : null, description: formDescription.trim() || null, item_type: null };
 
     if (editingItem) {
       const { data } = await supabase.from('shopping_items').update(payload).eq('id', editingItem.id).select().single();
@@ -92,30 +91,23 @@ export default function ShoppingPage({ onHome }) {
     setItems(prev => prev.filter(i => i.id !== id));
   }
 
-  async function clearChecked() {
-    const ids = items.filter(i => i.category === 'groceries' && i.checked).map(i => i.id);
-    if (!ids.length) return;
-    await supabase.from('shopping_items').delete().in('id', ids);
-    setItems(prev => prev.filter(i => !ids.includes(i.id)));
-  }
-
   function openForm(item = null) {
     setEditingItem(item);
     setFormName(item?.name ?? '');
-    setFormQty(item?.quantity ?? '');
-    setFormAisle(item?.aisle ?? '');
+    setFormItemType(item?.item_type ?? '');
     setFormForWhom(item?.for_whom ?? '');
+    setFormDescription(item?.description ?? '');
+    setFormOccasion(item?.occasion ?? '');
     setFormDeadline(item?.deadline ?? '');
     setFormBudget(item?.budget != null ? String(item.budget) : '');
-    setFormLink(item?.link ?? '');
     setShowForm(true);
   }
 
   function closeForm() {
     setShowForm(false);
     setEditingItem(null);
-    setFormName(''); setFormQty(''); setFormAisle('');
-    setFormForWhom(''); setFormDeadline(''); setFormBudget(''); setFormLink('');
+    setFormName(''); setFormItemType(''); setFormForWhom(''); setFormDescription('');
+    setFormOccasion(''); setFormDeadline(''); setFormBudget('');
   }
 
   function fmtDeadline(d) {
@@ -124,27 +116,29 @@ export default function ShoppingPage({ onHome }) {
   }
 
   const tabItems = useMemo(() => items.filter(i => i.category === tab), [items, tab]);
-  const groceriesCheckedCount = useMemo(() => items.filter(i => i.category === 'groceries' && i.checked).length, [items]);
-  const giftsTotal = useMemo(() => items.filter(i => i.category === 'gift' && !i.checked && i.budget).reduce((s, i) => s + i.budget, 0), [items]);
+  const pendingCount = (cat) => items.filter(i => i.category === cat && !i.checked).length;
 
-  // Group groceries by aisle
-  const groupedGroceries = useMemo(() => {
-    if (tab !== 'groceries') return null;
+  // Group clothing by item_type
+  const groupedClothing = useMemo(() => {
+    if (tab !== 'clothing') return null;
     const pending = tabItems.filter(i => !i.checked);
     const checked = tabItems.filter(i => i.checked);
     const groups = {};
     pending.forEach(item => {
-      const key = item.aisle || (language === 'fr' ? 'Autre' : 'Other');
+      const key = item.item_type || (language === 'fr' ? 'Autre' : 'Other');
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
     return { groups, checked };
   }, [tabItems, tab, language]);
 
-  const pendingGifts = tabItems.filter(i => !i.checked).length;
-  const pendingGroceries = tabItems.filter(i => !i.checked).length;
+  const giftsTotal = useMemo(
+    () => items.filter(i => i.category === 'gift' && !i.checked && i.budget).reduce((s, i) => s + i.budget, 0),
+    [items]
+  );
 
-  const aisles = language === 'fr' ? AISLES_FR : AISLES_EN;
+  const itemTypes = language === 'fr' ? ITEM_TYPES_FR : ITEM_TYPES_EN;
+  const occasions = language === 'fr' ? OCCASIONS_FR : OCCASIONS_EN;
 
   return (
     <div style={s.wrapper}>
@@ -164,31 +158,21 @@ export default function ShoppingPage({ onHome }) {
 
         {/* Tabs */}
         <div style={s.tabs}>
-          <button onClick={() => setTab('groceries')} style={{ ...s.tab, ...(tab === 'groceries' ? s.tabActive : {}) }}>
-            🛒 {t('Courses', 'Grocery')}
-            {pendingGroceries > 0 && <span style={s.tabBadge}>{pendingGroceries}</span>}
+          <button onClick={() => setTab('clothing')} style={{ ...s.tab, ...(tab === 'clothing' ? s.tabActive : {}) }}>
+            👕 {t('À acheter', 'To buy')}
+            {pendingCount('clothing') > 0 && <span style={s.tabBadge}>{pendingCount('clothing')}</span>}
           </button>
           <button onClick={() => setTab('gift')} style={{ ...s.tab, ...(tab === 'gift' ? s.tabActive : {}) }}>
             🎁 {t('Cadeaux', 'Gifts')}
-            {pendingGifts > 0 && <span style={s.tabBadge}>{pendingGifts}</span>}
+            {pendingCount('gift') > 0 && <span style={s.tabBadge}>{pendingCount('gift')}</span>}
           </button>
         </div>
 
-        {/* Summary bars */}
-        {tab === 'groceries' && groceriesCheckedCount > 0 && (
-          <div style={s.summaryBar}>
-            <span style={s.summaryText}>
-              ✅ {groceriesCheckedCount} {t('article(s) coché(s)', 'item(s) checked')}
-            </span>
-            <button onClick={clearChecked} style={s.clearBtn}>
-              🗑️ {t('Effacer', 'Clear')}
-            </button>
-          </div>
-        )}
+        {/* Gift budget summary */}
         {tab === 'gift' && giftsTotal > 0 && (
           <div style={s.summaryBar}>
-            <span style={s.summaryText}>{t('Budget cadeaux estimé', 'Estimated gift budget')}</span>
-            <span style={{ ...s.summaryText, fontWeight: '700', color: ACCENT }}>{fmtEur(giftsTotal)}</span>
+            <span style={s.summaryLabel}>{t('Budget cadeaux restants', 'Remaining gift budget')}</span>
+            <span style={s.summaryAmount}>{fmtEur(giftsTotal)}</span>
           </div>
         )}
 
@@ -198,63 +182,52 @@ export default function ShoppingPage({ onHome }) {
             <p style={s.empty}>{t('Chargement…', 'Loading…')}</p>
           ) : tabItems.length === 0 ? (
             <div style={s.emptyCard}>
-              <p style={s.emptyIcon}>{tab === 'groceries' ? '🛒' : '🎁'}</p>
+              <p style={s.emptyIcon}>{tab === 'clothing' ? '👕' : '🎁'}</p>
               <p style={s.emptyText}>
-                {tab === 'groceries'
-                  ? t('Liste vide — ajoutez des articles', 'Empty list — add items')
+                {tab === 'clothing'
+                  ? t('Aucun article à acheter', 'Nothing to buy')
                   : t('Aucun cadeau prévu', 'No gifts planned')}
               </p>
             </div>
-          ) : tab === 'groceries' ? (
-            // Grouped by aisle
+          ) : tab === 'clothing' ? (
             <>
-              {Object.entries(groupedGroceries.groups).map(([aisle, aisleItems]) => (
-                <div key={aisle}>
-                  <p style={s.aisleHeader}>{aisle}</p>
-                  {aisleItems.map(item => (
-                    <GroceryRow key={item.id} item={item} onToggle={toggleChecked} onEdit={openForm} onDel={del} />
-                  ))}
+              {Object.entries(groupedClothing.groups).map(([type, typeItems]) => (
+                <div key={type}>
+                  <p style={s.groupHeader}>{type}</p>
+                  {typeItems.map(item => <ClothingRow key={item.id} item={item} onToggle={toggleChecked} onEdit={openForm} onDel={del} />)}
                 </div>
               ))}
-              {groupedGroceries.checked.length > 0 && (
+              {groupedClothing.checked.length > 0 && (
                 <div>
-                  <p style={{ ...s.aisleHeader, color: '#B2BEC3' }}>✅ {t('Achetés', 'Bought')}</p>
-                  {groupedGroceries.checked.map(item => (
-                    <GroceryRow key={item.id} item={item} onToggle={toggleChecked} onEdit={openForm} onDel={del} />
-                  ))}
+                  <p style={{ ...s.groupHeader, color: '#B2BEC3' }}>✅ {t('Achetés', 'Bought')}</p>
+                  {groupedClothing.checked.map(item => <ClothingRow key={item.id} item={item} onToggle={toggleChecked} onEdit={openForm} onDel={del} />)}
                 </div>
               )}
             </>
           ) : (
-            // Gift list
             tabItems.map(item => {
               const days = daysUntil(item.deadline);
-              const urgency = days === null ? 'none' : days < 0 ? 'overdue' : days <= 7 ? 'soon' : 'ok';
+              const urgency = days === null ? 'none' : days < 0 ? 'overdue' : days <= 14 ? 'soon' : 'ok';
               return (
                 <div key={item.id} style={{ ...s.giftRow, opacity: item.checked ? 0.55 : 1 }}>
                   <button onClick={() => toggleChecked(item)} style={s.check}>
                     {item.checked ? '✅' : '🎁'}
                   </button>
                   <div style={s.giftContent}>
-                    <div style={s.giftNameRow}>
+                    <div style={s.nameRow}>
                       <span style={{ ...s.name, textDecoration: item.checked ? 'line-through' : 'none' }}>{item.name}</span>
                       {item.for_whom && <span style={s.forWhomBadge}>👤 {item.for_whom}</span>}
+                      {item.occasion && <span style={s.occasionBadge}>🎊 {item.occasion}</span>}
                     </div>
                     <div style={s.meta}>
                       {item.deadline && (
                         <span style={{ fontSize: '12px', color: urgency === 'overdue' ? '#E74C3C' : urgency === 'soon' ? '#E67E22' : '#636E72' }}>
                           {urgency === 'overdue' ? '⚠️' : urgency === 'soon' ? '⏰' : '📅'} {fmtDeadline(item.deadline)}
-                          {days !== null && days >= 0 && ` (${days}j)`}
+                          {days !== null && days >= 0 && ` · ${days}j`}
                         </span>
                       )}
-                      {item.budget && (
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#2D3436' }}>💶 {fmtEur(item.budget)}</span>
-                      )}
-                      {item.link && (
-                        <a href={item.link} target="_blank" rel="noopener noreferrer" style={s.link} onClick={e => e.stopPropagation()}>
-                          🔗 {t('Lien', 'Link')}
-                        </a>
-                      )}
+                      {item.budget && <span style={{ fontSize: '12px', fontWeight: '600', color: '#2D3436' }}>💶 {fmtEur(item.budget)}</span>}
+                      {item.description && <span style={{ fontSize: '12px', color: '#636E72', fontStyle: 'italic' }}>{item.description}</span>}
                     </div>
                   </div>
                   <div style={s.actions}>
@@ -278,61 +251,72 @@ export default function ShoppingPage({ onHome }) {
             <div style={s.modal} onClick={e => e.stopPropagation()}>
               <div style={s.mHeader}>
                 <h2 style={s.mTitle}>
-                  {editingItem
-                    ? t('Modifier', 'Edit')
-                    : tab === 'groceries' ? t('Ajouter un article', 'Add item') : t('Ajouter un cadeau', 'Add gift')}
+                  {editingItem ? t('Modifier', 'Edit') : tab === 'clothing' ? t('Ajouter un article', 'Add item') : t('Ajouter un cadeau', 'Add gift')}
                 </h2>
                 <button onClick={closeForm} style={s.closeBtn}>✕</button>
               </div>
 
               <div style={s.mForm}>
-                {/* Name */}
                 <div style={s.field}>
-                  <label style={s.label}>{tab === 'groceries' ? t('Article', 'Item') : t('Cadeau / idée', 'Gift / idea')} *</label>
+                  <label style={s.label}>{t('Nom', 'Name')} *</label>
                   <input autoFocus type="text" value={formName} onChange={e => setFormName(e.target.value)}
-                    placeholder={tab === 'groceries' ? t('Ex: Lait, pain…', 'Ex: Milk, bread…') : t('Ex: AirPods, livre…', 'Ex: AirPods, book…')}
+                    placeholder={tab === 'clothing' ? t('Ex: Pull beige, Veste en cuir…', 'Ex: Beige sweater, Leather jacket…') : t('Ex: Montre, Livre de cuisine…', 'Ex: Watch, Cookbook…')}
                     style={s.input} />
                 </div>
 
-                {tab === 'groceries' ? (
+                {tab === 'clothing' ? (
                   <>
                     <div style={s.row2}>
                       <div style={{ ...s.field, flex: 1 }}>
-                        <label style={s.label}>{t('Quantité (optionnel)', 'Quantity (optional)')}</label>
-                        <input type="text" value={formQty} onChange={e => setFormQty(e.target.value)}
-                          placeholder="Ex: 2, 500g…" style={s.input} />
-                      </div>
-                      <div style={{ ...s.field, flex: 1 }}>
-                        <label style={s.label}>{t('Rayon (optionnel)', 'Aisle (optional)')}</label>
-                        <select value={formAisle} onChange={e => setFormAisle(e.target.value)} style={s.input}>
+                        <label style={s.label}>{t('Type', 'Type')}</label>
+                        <select value={formItemType} onChange={e => setFormItemType(e.target.value)} style={s.input}>
                           <option value="">—</option>
-                          {aisles.map(a => <option key={a} value={a}>{a}</option>)}
+                          {itemTypes.map(tp => <option key={tp} value={tp}>{tp}</option>)}
                         </select>
                       </div>
+                      <div style={{ ...s.field, flex: 1 }}>
+                        <label style={s.label}>{t('Pour qui', 'For whom')}</label>
+                        <input type="text" value={formForWhom} onChange={e => setFormForWhom(e.target.value)}
+                          placeholder={t('Ex: Ricky, Emma…', 'Ex: Ricky, Emma…')} style={s.input} />
+                      </div>
+                    </div>
+                    <div style={s.field}>
+                      <label style={s.label}>{t('Description — pointure, couleur, marque… (optionnel)', 'Description — size, color, brand… (optional)')}</label>
+                      <input type="text" value={formDescription} onChange={e => setFormDescription(e.target.value)}
+                        placeholder={t('Ex: Taille M, bleu marine, Nike', 'Ex: Size M, navy blue, Nike')} style={s.input} />
                     </div>
                   </>
                 ) : (
                   <>
-                    <div style={s.field}>
-                      <label style={s.label}>{t('Pour qui (optionnel)', 'For whom (optional)')}</label>
-                      <input type="text" value={formForWhom} onChange={e => setFormForWhom(e.target.value)}
-                        placeholder={t('Ex: Ricky, Emma…', 'Ex: Ricky, Emma…')} style={s.input} />
+                    <div style={s.row2}>
+                      <div style={{ ...s.field, flex: 1 }}>
+                        <label style={s.label}>{t('Pour qui', 'For whom')}</label>
+                        <input type="text" value={formForWhom} onChange={e => setFormForWhom(e.target.value)}
+                          placeholder={t('Ex: Ricky, Emma…', 'Ex: Ricky, Emma…')} style={s.input} />
+                      </div>
+                      <div style={{ ...s.field, flex: 1 }}>
+                        <label style={s.label}>{t('Occasion', 'Occasion')}</label>
+                        <select value={formOccasion} onChange={e => setFormOccasion(e.target.value)} style={s.input}>
+                          <option value="">—</option>
+                          {occasions.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div style={s.row2}>
                       <div style={{ ...s.field, flex: 1 }}>
-                        <label style={s.label}>{t('Date limite (optionnel)', 'Deadline (optional)')}</label>
+                        <label style={s.label}>{t('Date limite', 'Deadline')}</label>
                         <input type="date" value={formDeadline} onChange={e => setFormDeadline(e.target.value)} style={s.input} />
                       </div>
                       <div style={{ ...s.field, flex: 1 }}>
-                        <label style={s.label}>{t('Budget max (optionnel)', 'Max budget (optional)')}</label>
+                        <label style={s.label}>{t('Budget max (€)', 'Max budget (€)')}</label>
                         <input type="number" min="0" step="5" value={formBudget}
                           onChange={e => setFormBudget(e.target.value)} placeholder="€" style={s.input} />
                       </div>
                     </div>
                     <div style={s.field}>
-                      <label style={s.label}>{t('Lien produit (optionnel)', 'Product link (optional)')}</label>
-                      <input type="url" value={formLink} onChange={e => setFormLink(e.target.value)}
-                        placeholder="https://amazon.fr/…" style={s.input} />
+                      <label style={s.label}>{t('Description / lien (optionnel)', 'Description / link (optional)')}</label>
+                      <input type="text" value={formDescription} onChange={e => setFormDescription(e.target.value)}
+                        placeholder={t('Ex: idée de marque, lien produit…', 'Ex: brand idea, product link…')} style={s.input} />
                     </div>
                   </>
                 )}
@@ -353,15 +337,18 @@ export default function ShoppingPage({ onHome }) {
   );
 }
 
-function GroceryRow({ item, onToggle, onEdit, onDel }) {
+function ClothingRow({ item, onToggle, onEdit, onDel }) {
   return (
-    <div style={{ ...s.groceryRow, opacity: item.checked ? 0.5 : 1 }}>
+    <div style={{ ...s.clothingRow, opacity: item.checked ? 0.5 : 1 }}>
       <button onClick={() => onToggle(item)} style={s.check}>
-        {item.checked ? '☑️' : '⬜'}
+        {item.checked ? '✅' : '⬜'}
       </button>
-      <div style={s.groceryContent}>
-        <span style={{ ...s.name, textDecoration: item.checked ? 'line-through' : 'none' }}>{item.name}</span>
-        {item.quantity && <span style={s.qty}>{item.quantity}</span>}
+      <div style={s.clothingContent}>
+        <div style={s.nameRow}>
+          <span style={{ ...s.name, textDecoration: item.checked ? 'line-through' : 'none' }}>{item.name}</span>
+          {item.for_whom && <span style={s.forWhomBadge}>👤 {item.for_whom}</span>}
+        </div>
+        {item.description && <span style={{ fontSize: '12px', color: '#636E72', fontStyle: 'italic' }}>{item.description}</span>}
       </div>
       <div style={s.actions}>
         <button onClick={() => onEdit(item)} style={s.btn}>✏️</button>
@@ -385,25 +372,24 @@ const s = {
   tabActive: { color: ACCENT, borderBottomColor: ACCENT },
   tabBadge: { backgroundColor: ACCENT, color: 'white', fontSize: '11px', fontWeight: '700', minWidth: '18px', height: '18px', borderRadius: '9px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' },
   summaryBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FDECEA', padding: '10px 16px', borderBottom: '1px solid #FADADD' },
-  summaryText: { fontSize: '13px', color: '#922B21' },
-  clearBtn: { fontSize: '13px', padding: '4px 12px', borderRadius: '8px', border: '1px solid #E74C3C', backgroundColor: 'white', color: '#E74C3C', cursor: 'pointer', fontFamily: FONT },
+  summaryLabel: { fontSize: '13px', color: '#922B21' },
+  summaryAmount: { fontSize: '15px', fontWeight: '700', color: ACCENT },
   list: { flex: 1, padding: '12px 16px', display: 'flex', flexDirection: 'column', paddingBottom: '100px' },
   emptyCard: { backgroundColor: 'white', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', marginTop: '8px' },
   emptyIcon: { fontSize: '48px', margin: '0 0 12px' },
   emptyText: { color: '#636E72', fontSize: '15px', margin: 0 },
   empty: { textAlign: 'center', color: '#636E72', padding: '40px 0' },
-  aisleHeader: { fontSize: '11px', fontWeight: '700', color: '#B2BEC3', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '12px 0 4px 4px' },
-  groceryRow: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'white', borderRadius: '10px', padding: '10px 12px', marginBottom: '4px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
-  groceryContent: { flex: 1, display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 },
+  groupHeader: { fontSize: '11px', fontWeight: '700', color: '#636E72', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '14px 0 4px 2px' },
+  clothingRow: { display: 'flex', alignItems: 'flex-start', gap: '10px', backgroundColor: 'white', borderRadius: '10px', padding: '11px 12px', marginBottom: '4px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
+  clothingContent: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' },
   giftRow: { display: 'flex', alignItems: 'flex-start', gap: '10px', backgroundColor: 'white', borderRadius: '12px', padding: '12px 14px', marginBottom: '8px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' },
   giftContent: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' },
-  giftNameRow: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' },
-  forWhomBadge: { fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', backgroundColor: '#FFF0F0', color: ACCENT, whiteSpace: 'nowrap' },
-  meta: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' },
-  check: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', flexShrink: 0, padding: 0, lineHeight: 1, paddingTop: '1px' },
+  nameRow: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' },
   name: { fontSize: '15px', fontWeight: '500', color: '#2D3436' },
-  qty: { fontSize: '12px', color: '#636E72', backgroundColor: '#F5F7FA', padding: '1px 6px', borderRadius: '6px' },
-  link: { fontSize: '12px', color: '#3498DB', textDecoration: 'none', fontWeight: '500' },
+  forWhomBadge: { fontSize: '11px', fontWeight: '600', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#FFF0F0', color: ACCENT, whiteSpace: 'nowrap' },
+  occasionBadge: { fontSize: '11px', fontWeight: '600', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#FFF8E6', color: '#E67E22', whiteSpace: 'nowrap' },
+  meta: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' },
+  check: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', flexShrink: 0, padding: 0, lineHeight: 1, paddingTop: '2px' },
   actions: { display: 'flex', gap: '4px', flexShrink: 0 },
   btn: { width: '30px', height: '30px', border: '1px solid #E1E8ED', borderRadius: '6px', backgroundColor: 'white', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   fab: { position: 'fixed', bottom: '24px', right: 'max(20px, calc(50% - 280px))', width: '56px', height: '56px', borderRadius: '28px', backgroundColor: ACCENT, color: 'white', border: 'none', boxShadow: '0 4px 12px rgba(231,76,60,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
