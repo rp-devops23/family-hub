@@ -8,6 +8,17 @@ import { useAuth } from '../../context/AuthContext';
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
+const PRIORITY_META = {
+  1: { emoji: '🔴', labelFr: 'Urgent',    labelEn: 'Urgent',    color: '#E74C3C', bg: '#FDEAEA' },
+  2: { emoji: '🟡', labelFr: 'Prévu',     labelEn: 'Planned',   color: '#E67E22', bg: '#FFF3E0' },
+  3: { emoji: '🔵', labelFr: 'Envisagé',  labelEn: 'Considered', color: '#3498DB', bg: '#EBF5FB' },
+};
+
+function formatAmount(n) {
+  if (!n && n !== 0) return '';
+  return new Intl.NumberFormat('fr-BE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+}
+
 export default function TasksPage({ onHome }) {
   const { user, language, toggleLanguage, signOut, t } = useAuth();
   const [tab, setTab] = useState('chore'); // 'chore' | 'work'
@@ -17,9 +28,12 @@ export default function TasksPage({ onHome }) {
   const [editingTask, setEditingTask] = useState(null);
 
   // Form state
-  const [formName, setFormName] = useState('');
-  const [formExpires, setFormExpires] = useState('');
-  const [formSaving, setFormSaving] = useState(false);
+  const [formName, setFormName]           = useState('');
+  const [formExpires, setFormExpires]     = useState('');
+  const [formPriority, setFormPriority]   = useState(2);
+  const [formAmount, setFormAmount]       = useState('');
+  const [formDriveLink, setFormDriveLink] = useState('');
+  const [formSaving, setFormSaving]       = useState(false);
 
   useEffect(() => { if (user) loadTasks(); }, [user]);
 
@@ -30,6 +44,7 @@ export default function TasksPage({ onHome }) {
       .select('*')
       .eq('user_id', user.id)
       .order('done', { ascending: true })
+      .order('priority', { ascending: true, nullsFirst: false })
       .order('expires_at', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
     setTasks(data ?? []);
@@ -52,14 +67,17 @@ export default function TasksPage({ onHome }) {
       name: formName.trim(),
       category: tab,
       expires_at: formExpires || null,
-      user_id: user.id,
       updated_at: new Date().toISOString(),
+      // work-only fields
+      priority:         tab === 'work' ? formPriority : null,
+      estimated_amount: tab === 'work' && formAmount !== '' ? parseFloat(formAmount) : null,
+      drive_link:       tab === 'work' && formDriveLink.trim() ? formDriveLink.trim() : null,
     };
     if (editingTask) {
       const { data } = await supabase.from('tasks').update(payload).eq('id', editingTask.id).select().single();
       if (data) setTasks(prev => prev.map(t => t.id === editingTask.id ? data : t));
     } else {
-      const { data } = await supabase.from('tasks').insert(payload).select().single();
+      const { data } = await supabase.from('tasks').insert({ ...payload, user_id: user.id }).select().single();
       if (data) setTasks(prev => [data, ...prev]);
     }
     setFormSaving(false);
@@ -75,6 +93,9 @@ export default function TasksPage({ onHome }) {
     setEditingTask(task);
     setFormName(task?.name ?? '');
     setFormExpires(task?.expires_at ?? '');
+    setFormPriority(task?.priority ?? 2);
+    setFormAmount(task?.estimated_amount != null ? String(task.estimated_amount) : '');
+    setFormDriveLink(task?.drive_link ?? '');
     setShowForm(true);
   }
 
@@ -83,6 +104,9 @@ export default function TasksPage({ onHome }) {
     setEditingTask(null);
     setFormName('');
     setFormExpires('');
+    setFormPriority(2);
+    setFormAmount('');
+    setFormDriveLink('');
   }
 
   const tabTasks = useMemo(() => tasks.filter(t => t.category === tab), [tasks, tab]);
@@ -97,8 +121,10 @@ export default function TasksPage({ onHome }) {
 
   function formatExpiry(expiresAt) {
     if (!expiresAt) return '';
-    const d = new Date(expiresAt);
-    return d.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short' });
+    return new Date(expiresAt).toLocaleDateString(
+      language === 'fr' ? 'fr-FR' : 'en-US',
+      { day: 'numeric', month: 'short' }
+    );
   }
 
   const pendingCount = (cat) => tasks.filter(t => t.category === cat && !t.done).length;
@@ -124,8 +150,8 @@ export default function TasksPage({ onHome }) {
         {/* Tabs */}
         <div style={styles.tabs}>
           {[
-            { key: 'chore', labelFr: 'Corvées', labelEn: 'Chores', icon: '🧹' },
-            { key: 'work', labelFr: 'Travaux', labelEn: 'Home Work', icon: '🔨' },
+            { key: 'chore', labelFr: 'Corvées',  labelEn: 'Chores',     icon: '🧹' },
+            { key: 'work',  labelFr: 'Travaux',   labelEn: 'Home Work',  icon: '🔨' },
           ].map(tab_ => (
             <button
               key={tab_.key}
@@ -156,24 +182,50 @@ export default function TasksPage({ onHome }) {
           ) : (
             tabTasks.map(task => {
               const status = getExpiryStatus(task.expires_at);
+              const prio = task.priority ? PRIORITY_META[task.priority] : null;
               return (
                 <div key={task.id} style={{ ...styles.taskRow, opacity: task.done ? 0.6 : 1 }}>
                   <button onClick={() => toggleDone(task)} style={styles.checkbox}>
                     {task.done ? '✅' : '⬜'}
                   </button>
                   <div style={styles.taskContent}>
-                    <span style={{ ...styles.taskName, textDecoration: task.done ? 'line-through' : 'none' }}>
-                      {task.name}
-                    </span>
-                    {task.expires_at && (
-                      <span style={{
-                        ...styles.taskExpiry,
-                        color: status === 'overdue' ? '#E74C3C' : status === 'soon' ? '#E67E22' : '#636E72',
-                      }}>
-                        {status === 'overdue' ? '⚠️ ' : status === 'soon' ? '⏰ ' : '📅 '}
-                        {formatExpiry(task.expires_at)}
+                    <div style={styles.taskNameRow}>
+                      <span style={{ ...styles.taskName, textDecoration: task.done ? 'line-through' : 'none' }}>
+                        {task.name}
                       </span>
-                    )}
+                      {prio && (
+                        <span style={{ ...styles.prioBadge, backgroundColor: prio.bg, color: prio.color }}>
+                          {prio.emoji} {language === 'fr' ? prio.labelFr : prio.labelEn}
+                        </span>
+                      )}
+                    </div>
+                    <div style={styles.taskMeta}>
+                      {task.expires_at && (
+                        <span style={{
+                          ...styles.taskMetaItem,
+                          color: status === 'overdue' ? '#E74C3C' : status === 'soon' ? '#E67E22' : '#636E72',
+                        }}>
+                          {status === 'overdue' ? '⚠️' : status === 'soon' ? '⏰' : '📅'}
+                          {' '}{formatExpiry(task.expires_at)}
+                        </span>
+                      )}
+                      {task.estimated_amount != null && (
+                        <span style={{ ...styles.taskMetaItem, color: '#2D3436', fontWeight: '600' }}>
+                          💶 {formatAmount(task.estimated_amount)}
+                        </span>
+                      )}
+                      {task.drive_link && (
+                        <a
+                          href={task.drive_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={styles.driveLink}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          📎 {t('Devis', 'Quote')}
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <div style={styles.taskActions}>
                     <button onClick={() => openForm(task)} style={styles.actionBtn}>✏️</button>
@@ -204,17 +256,22 @@ export default function TasksPage({ onHome }) {
               </div>
 
               <div style={styles.modalForm}>
+                {/* Name */}
                 <div style={styles.field}>
                   <label style={styles.label}>{t('Nom', 'Name')} *</label>
                   <input
                     type="text"
                     value={formName}
                     onChange={e => setFormName(e.target.value)}
-                    placeholder={tab === 'chore' ? t('Ex: Passer l\'aspirateur', 'Ex: Vacuum the floors') : t('Ex: Peindre le salon', 'Ex: Paint the living room')}
+                    placeholder={tab === 'chore'
+                      ? t('Ex: Passer l\'aspirateur', 'Ex: Vacuum the floors')
+                      : t('Ex: Peindre le salon', 'Ex: Paint the living room')}
                     style={styles.input}
                     autoFocus
                   />
                 </div>
+
+                {/* Due date */}
                 <div style={styles.field}>
                   <label style={styles.label}>{t('À faire avant le (optionnel)', 'Due date (optional)')}</label>
                   <input
@@ -224,6 +281,64 @@ export default function TasksPage({ onHome }) {
                     style={styles.input}
                   />
                 </div>
+
+                {/* Work-only fields */}
+                {tab === 'work' && (
+                  <>
+                    {/* Priority */}
+                    <div style={styles.field}>
+                      <label style={styles.label}>{t('Priorité', 'Priority')}</label>
+                      <div style={styles.prioGroup}>
+                        {[1, 2, 3].map(p => {
+                          const m = PRIORITY_META[p];
+                          const active = formPriority === p;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setFormPriority(p)}
+                              style={{
+                                ...styles.prioBtn,
+                                backgroundColor: active ? m.bg : 'white',
+                                color: active ? m.color : '#636E72',
+                                borderColor: active ? m.color : '#E1E8ED',
+                                fontWeight: active ? '700' : '400',
+                              }}
+                            >
+                              {m.emoji} {p} — {language === 'fr' ? m.labelFr : m.labelEn}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Estimated amount */}
+                    <div style={styles.field}>
+                      <label style={styles.label}>{t('Montant estimé (€, optionnel)', 'Estimated cost (€, optional)')}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        value={formAmount}
+                        onChange={e => setFormAmount(e.target.value)}
+                        placeholder="Ex: 1500"
+                        style={styles.input}
+                      />
+                    </div>
+
+                    {/* Drive link */}
+                    <div style={styles.field}>
+                      <label style={styles.label}>{t('Lien Drive (devis, optionnel)', 'Drive link (quote, optional)')}</label>
+                      <input
+                        type="url"
+                        value={formDriveLink}
+                        onChange={e => setFormDriveLink(e.target.value)}
+                        placeholder="https://drive.google.com/..."
+                        style={styles.input}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div style={styles.modalButtons}>
@@ -271,7 +386,7 @@ const styles = {
   },
 
   tabs: {
-    display: 'flex', gap: '0', backgroundColor: 'white',
+    display: 'flex', backgroundColor: 'white',
     borderBottom: '1px solid #FDE8CC',
   },
   tab: {
@@ -280,9 +395,7 @@ const styles = {
     borderBottom: '3px solid transparent', fontFamily: FONT,
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
   },
-  tabActive: {
-    color: '#E67E22', borderBottomColor: '#E67E22',
-  },
+  tabActive: { color: '#E67E22', borderBottomColor: '#E67E22' },
   tabBadge: {
     backgroundColor: '#E67E22', color: 'white',
     fontSize: '11px', fontWeight: '700',
@@ -304,19 +417,32 @@ const styles = {
   empty: { textAlign: 'center', color: '#636E72', padding: '40px 0' },
 
   taskRow: {
-    display: 'flex', alignItems: 'center', gap: '10px',
+    display: 'flex', alignItems: 'flex-start', gap: '10px',
     backgroundColor: 'white', borderRadius: '12px', padding: '12px 14px',
     boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
   },
   checkbox: {
     background: 'none', border: 'none', cursor: 'pointer',
-    fontSize: '22px', flexShrink: 0, padding: 0, lineHeight: 1,
+    fontSize: '22px', flexShrink: 0, padding: 0, lineHeight: 1, paddingTop: '2px',
   },
   taskContent: {
-    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px',
+    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px',
+  },
+  taskNameRow: {
+    display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
   },
   taskName: { fontSize: '15px', fontWeight: '500', color: '#2D3436' },
-  taskExpiry: { fontSize: '12px' },
+  prioBadge: {
+    fontSize: '11px', fontWeight: '600', padding: '2px 8px',
+    borderRadius: '10px', whiteSpace: 'nowrap',
+  },
+  taskMeta: {
+    display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center',
+  },
+  taskMetaItem: { fontSize: '12px' },
+  driveLink: {
+    fontSize: '12px', color: '#3498DB', textDecoration: 'none', fontWeight: '500',
+  },
   taskActions: { display: 'flex', gap: '4px', flexShrink: 0 },
   actionBtn: {
     width: '30px', height: '30px', border: '1px solid #E1E8ED',
@@ -339,6 +465,7 @@ const styles = {
   modal: {
     backgroundColor: 'white', borderRadius: '20px 20px 0 0',
     width: '100%', maxWidth: '500px', paddingBottom: '24px',
+    maxHeight: '90vh', overflowY: 'auto',
   },
   modalHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -357,7 +484,15 @@ const styles = {
     borderRadius: '10px', fontSize: '15px', outline: 'none', boxSizing: 'border-box',
     fontFamily: FONT,
   },
-  modalButtons: { display: 'flex', gap: '12px', padding: '0 20px' },
+  prioGroup: {
+    display: 'flex', flexDirection: 'column', gap: '8px',
+  },
+  prioBtn: {
+    width: '100%', padding: '10px 14px', border: '2px solid',
+    borderRadius: '10px', fontSize: '14px', cursor: 'pointer',
+    textAlign: 'left', fontFamily: FONT, transition: 'all 0.1s',
+  },
+  modalButtons: { display: 'flex', gap: '12px', padding: '8px 20px 0' },
   cancelBtn: {
     flex: 1, padding: '14px', border: '1px solid #E1E8ED', backgroundColor: 'white',
     borderRadius: '10px', fontSize: '15px', cursor: 'pointer', color: '#636E72', fontFamily: FONT,
