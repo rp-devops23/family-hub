@@ -58,16 +58,13 @@ export default function HomePage() {
     });
   }, [accountTx, thisMonth, thisYear]);
 
-  // KPI values
-  const thisMonthTotal = thisMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
-  const lastMonthTotal = lastMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
-  const monthDiff = lastMonthTotal > 0 
-    ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 
-    : 0;
-
-  // Average transaction
-  const avgTransaction = thisMonthTx.length > 0 
-    ? thisMonthTotal / thisMonthTx.length 
+  // KPI values — income and expenses kept separate
+  const thisMonthIncome   = thisMonthTx.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
+  const thisMonthExpenses = thisMonthTx.filter(tx => (tx.type || 'expense') === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+  const thisMonthBalance  = thisMonthIncome - thisMonthExpenses;
+  const lastMonthExpenses = lastMonthTx.filter(tx => (tx.type || 'expense') === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+  const expenseDiff = lastMonthExpenses > 0
+    ? ((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
     : 0;
 
   // ============================================================================
@@ -225,40 +222,38 @@ export default function HomePage() {
       {/* KPI Cards */}
       <div style={styles.kpiGrid}>
         <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>💸</span>
+          <span style={styles.kpiIcon}>💰</span>
           <div>
-            <span style={styles.kpiLabel}>{t('Ce mois', 'This month')}</span>
-            <span style={styles.kpiValue}>{formatAmount(thisMonthTotal)}</span>
+            <span style={styles.kpiLabel}>{t('Revenus', 'Income')}</span>
+            <span style={{ ...styles.kpiValue, color: '#00B894' }}>{formatAmount(thisMonthIncome)}</span>
           </div>
         </div>
-        
+
         <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>{monthDiff <= 0 ? '📉' : '📈'}</span>
+          <span style={styles.kpiIcon}>💸</span>
           <div>
-            <span style={styles.kpiLabel}>{t('vs mois dernier', 'vs last month')}</span>
-            <span style={{
-              ...styles.kpiValue,
-              color: monthDiff <= 0 ? '#00B894' : '#E74C3C',
-              fontSize: '18px',
-            }}>
-              {monthDiff > 0 ? '+' : ''}{monthDiff.toFixed(0)}%
+            <span style={styles.kpiLabel}>{t('Dépenses', 'Expenses')}</span>
+            <span style={{ ...styles.kpiValue, color: '#E74C3C' }}>{formatAmount(thisMonthExpenses)}</span>
+          </div>
+        </div>
+
+        <div style={styles.kpiCard}>
+          <span style={styles.kpiIcon}>{thisMonthBalance >= 0 ? '🏦' : '⚠️'}</span>
+          <div>
+            <span style={styles.kpiLabel}>{t('Balance', 'Balance')}</span>
+            <span style={{ ...styles.kpiValue, color: thisMonthBalance >= 0 ? '#00B894' : '#E74C3C' }}>
+              {thisMonthBalance >= 0 ? '+' : ''}{formatAmount(thisMonthBalance)}
             </span>
           </div>
         </div>
 
         <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>🧾</span>
+          <span style={styles.kpiIcon}>{expenseDiff <= 0 ? '📉' : '📈'}</span>
           <div>
-            <span style={styles.kpiLabel}>{t('Transactions', 'Transactions')}</span>
-            <span style={styles.kpiValue}>{thisMonthTx.length}</span>
-          </div>
-        </div>
-
-        <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>📊</span>
-          <div>
-            <span style={styles.kpiLabel}>{t('Moyenne', 'Average')}</span>
-            <span style={styles.kpiValue}>{formatAmount(avgTransaction)}</span>
+            <span style={styles.kpiLabel}>{t('Dép. vs mois préc.', 'Exp. vs last month')}</span>
+            <span style={{ ...styles.kpiValue, color: expenseDiff <= 0 ? '#00B894' : '#E74C3C', fontSize: '18px' }}>
+              {expenseDiff > 0 ? '+' : ''}{expenseDiff.toFixed(0)}%
+            </span>
           </div>
         </div>
       </div>

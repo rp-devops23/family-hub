@@ -40,16 +40,18 @@ export default function TransactionsPage() {
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [transactions, selectedMonth, selectedYear, searchQuery, filterCategories, filterAccounts, filterType]);
 
-  // Summary: income, expenses, balance
+  // Summary: income, expenses, balance — respects account filter
   const summary = useMemo(() => {
     const monthTx = transactions.filter(tx => {
       const d = new Date(tx.date);
-      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+      if (d.getMonth() !== selectedMonth || d.getFullYear() !== selectedYear) return false;
+      if (filterAccounts.length > 0 && !filterAccounts.includes(tx.account_id)) return false;
+      return true;
     });
     const income = monthTx.filter(tx => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
     const expenses = monthTx.filter(tx => (tx.type || 'expense') === 'expense').reduce((s, tx) => s + tx.amount, 0);
     return { income, expenses, balance: income - expenses };
-  }, [transactions, selectedMonth, selectedYear]);
+  }, [transactions, selectedMonth, selectedYear, filterAccounts]);
 
   const activeFilterCount = filterCategories.length + (filterType !== 'all' ? 1 : 0);
 

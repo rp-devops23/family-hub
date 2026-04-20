@@ -52,6 +52,7 @@ export default function ShoppingPage({ onHome }) {
       .from('shopping_items')
       .select('*')
       .eq('user_id', user.id)
+      .in('category', ['clothing', 'gift'])
       .order('checked', { ascending: true })
       .order('deadline', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
