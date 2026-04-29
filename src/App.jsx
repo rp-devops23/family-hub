@@ -8,6 +8,7 @@ import AgentApp from './apps/agent/AgentApp';
 import CorveesApp from './apps/corvees/CorveesApp';
 import TravauxApp from './apps/travaux/TravauxApp';
 import ShoppingApp from './apps/shopping/ShoppingApp';
+import HolidayApp from './apps/holiday/HolidayApp';
 import PortalPage from './portal/PortalPage';
 import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
@@ -63,6 +64,10 @@ function AppInner() {
 
   if (activeApp === 'shopping') {
     return <ShoppingApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'holiday') {
+    return <HolidayApp onHome={() => setActiveApp(null)} />;
   }
 
   return <PortalPage onSelectApp={setActiveApp} />;

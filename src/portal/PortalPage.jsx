@@ -66,6 +66,16 @@ const APPS = [
     color: '#E74C3C',
     bg: '#FFF5F5',
   },
+  {
+    id: 'holiday',
+    icon: '✈️',
+    titleFr: 'Vacances',
+    titleEn: 'Holidays',
+    descFr: 'Checklist préparation voyage',
+    descEn: 'Trip preparation checklist',
+    color: '#FF7043',
+    bg: '#FFF8F5',
+  },
 ];
 
 export default function PortalPage({ onSelectApp }) {
