@@ -24,7 +24,7 @@ const APPS = [
     descFr: 'Recettes, planning & courses',
     descEn: 'Recipes, meal planning & shopping',
     color: '#2D5A3D',
-    bg: '#27AE60',
+    bg: '#F0FFF4',
   },
   {
     id: 'agent',

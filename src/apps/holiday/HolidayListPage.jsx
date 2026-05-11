@@ -271,7 +271,7 @@ const s = {
   emptySubtitle: { fontSize: '14px', color: '#636E72', margin: 0 },
   createBtn: { marginTop: '8px', padding: '12px 28px', backgroundColor: ACCENT, color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '600', fontFamily: FONT },
 
-  list: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  list: { display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '96px' },
   tripCard: { display: 'flex', alignItems: 'center', gap: '14px', backgroundColor: 'white', borderRadius: '16px', padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', cursor: 'pointer', border: '1px solid #F0E6DF', transition: 'transform 0.1s' },
   tripEmoji: { fontSize: '36px', flexShrink: 0 },
   tripInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' },
