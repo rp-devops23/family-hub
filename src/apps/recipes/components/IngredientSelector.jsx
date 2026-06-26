@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, commonStyles } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
 
 export default function IngredientSelector({ selectedIngredients, onChange }) {
   const { t, getName, ingredients, createIngredient } = useApp()
@@ -102,25 +102,25 @@ export default function IngredientSelector({ selectedIngredients, onChange }) {
 const styles = {
   container: { display: 'flex', flexDirection: 'column' },
   selectedList: { display: 'flex', flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.sm },
-  selectedItem: { backgroundColor: colors.cream, borderRadius: borderRadius.md, padding: spacing.sm },
+  selectedItem: { backgroundColor: colors.background, borderRadius: '12px', padding: '10px 12px' },
   ingredientRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
   ingredientName: { fontSize: fontSizes.sm, fontWeight: 600, color: colors.textPrimary },
-  removeButton: { width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.warmGray, color: colors.textMuted, borderRadius: borderRadius.full, cursor: 'pointer', fontSize: fontSizes.xs },
+  removeButton: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.warmGray, color: colors.textMuted, borderRadius: '8px', cursor: 'pointer', fontSize: fontSizes.xs, transition: 'all 0.2s ease' },
   quantityRow: { display: 'flex', gap: spacing.sm },
-  quantityInput: { ...commonStyles.input, flex: 1, padding: spacing.xs, fontSize: fontSizes.sm },
-  unitInput: { ...commonStyles.input, width: '100px', padding: spacing.xs, fontSize: fontSizes.sm },
+  quantityInput: { ...commonStyles.input, flex: 1, padding: '8px 12px', fontSize: fontSizes.sm },
+  unitInput: { ...commonStyles.input, width: '100px', padding: '8px 12px', fontSize: fontSizes.sm },
   addSection: { position: 'relative' },
   searchContainer: { position: 'relative' },
-  searchInput: { ...commonStyles.input, padding: spacing.sm, fontSize: fontSizes.sm },
-  dropdown: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.white, border: `1px solid ${colors.warmGray}`, borderRadius: borderRadius.md, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 100, maxHeight: '250px', overflowY: 'auto' },
-  dropdownItem: { width: '100%', padding: spacing.sm, textAlign: 'left', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textPrimary, borderBottom: `1px solid ${colors.warmGray}` },
-  noResults: { padding: spacing.sm, textAlign: 'center', color: colors.textMuted, fontSize: fontSizes.sm },
-  newIngredientButton: { width: '100%', padding: spacing.sm, textAlign: 'left', border: 'none', backgroundColor: colors.forest + '10', cursor: 'pointer', fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.forest, fontWeight: 600 },
+  searchInput: { ...commonStyles.input, padding: '10px 14px', fontSize: fontSizes.sm },
+  dropdown: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: colors.white, border: `1px solid ${colors.warmGray}`, borderRadius: '12px', boxShadow: shadows.md, zIndex: 100, maxHeight: '250px', overflowY: 'auto', marginTop: '4px' },
+  dropdownItem: { width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textPrimary, borderBottom: `1px solid ${colors.background}`, transition: 'background-color 0.15s ease' },
+  noResults: { padding: '10px 14px', textAlign: 'center', color: colors.textMuted, fontSize: fontSizes.sm },
+  newIngredientButton: { width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none', backgroundColor: colors.forest + '0A', cursor: 'pointer', fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.forest, fontWeight: 600, borderRadius: '0 0 12px 12px' },
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 },
-  newForm: { backgroundColor: colors.cream, borderRadius: borderRadius.md, padding: spacing.md },
+  newForm: { backgroundColor: colors.background, borderRadius: '12px', padding: spacing.md },
   newFormHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   newFormTitle: { fontSize: fontSizes.sm, fontWeight: 600, color: colors.textPrimary },
-  cancelNewButton: { width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.warmGray, color: colors.textMuted, borderRadius: borderRadius.full, cursor: 'pointer', fontSize: fontSizes.xs },
-  newInput: { ...commonStyles.input, padding: spacing.sm, fontSize: fontSizes.sm, marginBottom: spacing.sm },
-  createButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary, width: '100%', padding: spacing.sm }
+  cancelNewButton: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.warmGray, color: colors.textMuted, borderRadius: '8px', cursor: 'pointer', fontSize: fontSizes.xs, transition: 'all 0.2s ease' },
+  newInput: { ...commonStyles.input, padding: '10px 14px', fontSize: fontSizes.sm, marginBottom: spacing.sm },
+  createButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary, width: '100%', padding: '10px' }
 }

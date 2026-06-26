@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors } from '../lib/theme'
+import { colors, shadows } from '../lib/theme'
 import ShoppingListGenerator from './ShoppingListGenerator'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -220,72 +220,73 @@ export default function ShoppingListPage() {
 }
 
 const styles = {
-  container: { padding: '20px 16px 100px', fontFamily: FONT },
+  container: { padding: '16px 16px 100px', fontFamily: FONT },
   addRow: { position: 'relative', marginBottom: '8px' },
   searchBar: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    backgroundColor: 'white', borderRadius: '10px', padding: '10px 14px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+    backgroundColor: 'white', borderRadius: '14px', padding: '12px 16px',
+    boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)'
   },
-  searchIcon: { fontSize: '16px' },
-  searchInput: { flex: 1, border: 'none', outline: 'none', fontSize: '15px', backgroundColor: 'transparent', fontFamily: FONT },
+  searchIcon: { fontSize: '16px', opacity: 0.6 },
+  searchInput: { flex: 1, border: 'none', outline: 'none', fontSize: '15px', backgroundColor: 'transparent', fontFamily: FONT, color: colors.textPrimary },
   suggestions: {
     position: 'absolute', top: '100%', left: 0, right: 0,
-    backgroundColor: 'white', borderRadius: '0 0 10px 10px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, maxHeight: '150px', overflowY: 'auto'
+    backgroundColor: 'white', borderRadius: '0 0 14px 14px',
+    boxShadow: shadows.md, zIndex: 10, maxHeight: '150px', overflowY: 'auto'
   },
   suggestionItem: {
-    width: '100%', padding: '10px 14px', backgroundColor: 'white', border: 'none',
-    borderBottom: '1px solid #F0F0F0', textAlign: 'left', cursor: 'pointer',
-    fontSize: '14px', fontFamily: FONT, color: '#636E72'
+    width: '100%', padding: '12px 16px', backgroundColor: 'white', border: 'none',
+    borderBottom: '1px solid ' + colors.background, textAlign: 'left', cursor: 'pointer',
+    fontSize: '14px', fontFamily: FONT, color: colors.textSecondary, transition: 'background-color 0.15s ease'
   },
   customRow: { display: 'flex', gap: '8px', marginBottom: '8px' },
   customInput: {
-    flex: 1, padding: '10px 14px', fontSize: '15px', fontFamily: FONT,
-    border: 'none', borderRadius: '10px', backgroundColor: 'white',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', outline: 'none', color: '#2D3436'
+    flex: 1, padding: '12px 16px', fontSize: '15px', fontFamily: FONT,
+    border: '1px solid rgba(0,0,0,0.04)', borderRadius: '14px', backgroundColor: 'white',
+    boxShadow: shadows.sm, outline: 'none', color: colors.textPrimary
   },
   addButton: {
-    padding: '10px 16px', backgroundColor: colors.forest, color: 'white',
-    border: 'none', borderRadius: '10px', cursor: 'pointer', fontFamily: FONT,
-    fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap'
+    padding: '12px 20px', backgroundColor: colors.forest, color: 'white',
+    border: 'none', borderRadius: '14px', cursor: 'pointer', fontFamily: FONT,
+    fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', transition: 'all 0.2s ease'
   },
   generatorButton: {
-    width: '100%', padding: '10px 14px', backgroundColor: 'white',
-    border: 'none', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-    cursor: 'pointer', fontFamily: FONT, fontSize: '14px', color: '#636E72',
-    textAlign: 'left', marginBottom: '20px'
+    width: '100%', padding: '12px 16px', backgroundColor: 'white',
+    border: '1px solid rgba(0,0,0,0.04)', borderRadius: '14px', boxShadow: shadows.sm,
+    cursor: 'pointer', fontFamily: FONT, fontSize: '14px', color: colors.textSecondary,
+    textAlign: 'left', marginBottom: '20px', transition: 'all 0.2s ease', fontWeight: 500
   },
-  empty: { backgroundColor: 'white', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
-  emptyText: { fontSize: '16px', color: '#636E72', margin: 0 },
+  empty: { backgroundColor: 'white', borderRadius: '16px', padding: '48px 20px', textAlign: 'center', boxShadow: shadows.sm },
+  emptyText: { fontSize: '15px', color: colors.textMuted, margin: 0 },
   section: { marginBottom: '16px' },
   sectionHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #F0F0F0'
+    marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid ' + colors.warmGray
   },
-  sectionTitle: { fontSize: '12px', fontWeight: 600, color: '#636E72', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  clearBtn: { padding: '4px 10px', backgroundColor: 'transparent', border: '1px solid #E1E8ED', borderRadius: '6px', fontSize: '12px', color: '#636E72', cursor: 'pointer', fontFamily: FONT },
+  sectionTitle: { fontSize: '12px', fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.6px' },
+  clearBtn: { padding: '5px 12px', backgroundColor: 'transparent', border: `1.5px solid ${colors.warmGray}`, borderRadius: '8px', fontSize: '12px', color: colors.textSecondary, cursor: 'pointer', fontFamily: FONT, transition: 'all 0.2s ease' },
   list: { display: 'flex', flexDirection: 'column', gap: '6px' },
   item: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    backgroundColor: 'white', borderRadius: '10px', padding: '12px 14px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+    backgroundColor: 'white', borderRadius: '14px', padding: '12px 16px',
+    boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)'
   },
   itemChecked: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    backgroundColor: '#F5F7FA', borderRadius: '10px', padding: '10px 14px'
+    backgroundColor: colors.background, borderRadius: '14px', padding: '10px 16px'
   },
-  checkbox: { width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0, accentColor: colors.forest },
+  checkbox: { width: '20px', height: '20px', cursor: 'pointer', flexShrink: 0, accentColor: colors.forest, borderRadius: '6px' },
   itemContent: { flex: 1 },
-  itemName: { fontSize: '15px', fontWeight: 500, color: '#2D3436' },
-  itemNameChecked: { flex: 1, fontSize: '14px', color: '#8A92A0', textDecoration: 'line-through' },
+  itemName: { fontSize: '15px', fontWeight: 500, color: colors.textPrimary },
+  itemNameChecked: { flex: 1, fontSize: '14px', color: colors.textMuted, textDecoration: 'line-through' },
   qtyRow: { display: 'flex', gap: '6px' },
-  qtyInput: { width: '55px', padding: '4px 8px', fontSize: '13px', border: '1px solid #E1E8ED', borderRadius: '6px', fontFamily: FONT, outline: 'none' },
-  unitInput: { width: '60px', padding: '4px 8px', fontSize: '13px', border: '1px solid #E1E8ED', borderRadius: '6px', fontFamily: FONT, outline: 'none' },
-  deleteBtn: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: '#F5F7FA', borderRadius: '50%', cursor: 'pointer', fontSize: '12px', color: '#636E72', flexShrink: 0 },
+  qtyInput: { width: '55px', padding: '6px 8px', fontSize: '13px', border: `1.5px solid ${colors.warmGray}`, borderRadius: '8px', fontFamily: FONT, outline: 'none' },
+  unitInput: { width: '60px', padding: '6px 8px', fontSize: '13px', border: `1.5px solid ${colors.warmGray}`, borderRadius: '8px', fontFamily: FONT, outline: 'none' },
+  deleteBtn: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.background, borderRadius: '8px', cursor: 'pointer', fontSize: '12px', color: colors.textMuted, flexShrink: 0, transition: 'all 0.2s ease' },
   clearAllBtn: {
-    width: '100%', padding: '10px', backgroundColor: 'transparent',
-    border: '1px dashed #BDC3C7', borderRadius: '10px', color: '#8A92A0',
-    fontSize: '13px', fontFamily: FONT, cursor: 'pointer', marginTop: '8px'
+    width: '100%', padding: '12px', backgroundColor: 'transparent',
+    border: `1.5px dashed ${colors.warmGrayDark}`, borderRadius: '14px', color: colors.textMuted,
+    fontSize: '13px', fontFamily: FONT, cursor: 'pointer', marginTop: '8px',
+    transition: 'all 0.2s ease', fontWeight: 500
   }
 }

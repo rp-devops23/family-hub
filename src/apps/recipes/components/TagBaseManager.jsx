@@ -6,7 +6,7 @@ import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles 
 const EMOJI_OPTIONS = ['🏷️', '⚡', '👶', '🥬', '🌱', '🍖', '🐟', '🌶️', '❤️', '⭐', '🔥', '🧀', '🥗', '🍝', '🍜', '🥘', '🍰', '🎉']
 
 export default function TagBaseManager({ type, onClose }) {
-  const { 
+  const {
     t, getName, language,
     tags, bases, ingredients, recipes,
     createTag, updateTag, deleteTag,
@@ -19,10 +19,10 @@ export default function TagBaseManager({ type, onClose }) {
   const isIngredient = type === 'ingredient'
 
   const items = isTag ? tags : isBase ? bases : ingredients
-  const title = isTag 
-    ? t('manage.tags.title') 
-    : isBase 
-      ? t('manage.bases.title') 
+  const title = isTag
+    ? t('manage.tags.title')
+    : isBase
+      ? t('manage.bases.title')
       : t('manage.ingredients.title')
 
   const [editingItem, setEditingItem] = useState(null)
@@ -37,13 +37,13 @@ export default function TagBaseManager({ type, onClose }) {
   // Count recipes using an item
   const getUsageCount = (itemId) => {
     if (isTag) {
-      return recipes.filter(r => 
+      return recipes.filter(r =>
         r.recipe_tags?.some(rt => rt.tag_id === itemId)
       ).length
     } else if (isBase) {
       return recipes.filter(r => r.base_id === itemId).length
     } else {
-      return recipes.filter(r => 
+      return recipes.filter(r =>
         r.recipe_ingredients?.some(ri => ri.ingredient_id === itemId)
       ).length
     }
@@ -204,7 +204,7 @@ export default function TagBaseManager({ type, onClose }) {
                         onClick={() => setIcon(emoji)}
                         style={{
                           ...styles.emojiButton,
-                          backgroundColor: icon === emoji ? colors.forest + '20' : 'transparent',
+                          backgroundColor: icon === emoji ? colors.forest + '18' : 'transparent',
                           borderColor: icon === emoji ? colors.forest : 'transparent'
                         }}
                       >
@@ -268,201 +268,91 @@ export default function TagBaseManager({ type, onClose }) {
   )
 }
 
-// ============================================
-// STYLES
-// ============================================
-
 const styles = {
   overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    zIndex: 1000
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: spacing.md, zIndex: 1000
   },
 
   modal: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    width: '100%',
-    maxWidth: '400px',
-    maxHeight: '80vh',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: shadows.lg
+    backgroundColor: colors.white, borderRadius: '20px',
+    width: '100%', maxWidth: '400px', maxHeight: '80vh',
+    display: 'flex', flexDirection: 'column', boxShadow: shadows.lg
   },
 
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottom: `1px solid ${colors.warmGray}`
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}`
   },
 
   title: {
-    fontFamily: fonts.heading,
-    fontSize: fontSizes.xl,
-    color: colors.forest,
-    margin: 0
+    fontFamily: fonts.heading, fontSize: fontSizes.xl,
+    color: colors.forest, margin: 0, fontWeight: 700
   },
 
   closeButton: {
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: colors.warmGray,
-    borderRadius: borderRadius.full,
-    cursor: 'pointer',
-    fontSize: fontSizes.md,
-    color: colors.textSecondary
+    width: '34px', height: '34px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', backgroundColor: colors.background, borderRadius: '10px',
+    cursor: 'pointer', fontSize: fontSizes.md, color: colors.textSecondary,
+    transition: 'all 0.2s ease'
   },
 
-  content: {
-    padding: spacing.md,
-    overflowY: 'auto',
-    flex: 1
-  },
+  content: { padding: '16px 20px', overflowY: 'auto', flex: 1 },
 
   list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginBottom: spacing.md
+    display: 'flex', flexDirection: 'column',
+    gap: spacing.sm, marginBottom: spacing.md
   },
 
   item: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.cream,
-    borderRadius: borderRadius.md
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '10px 12px', backgroundColor: colors.background,
+    borderRadius: '12px'
   },
 
-  itemInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1
-  },
+  itemInfo: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 },
+  itemIcon: { fontSize: fontSizes.lg },
+  itemNames: { display: 'flex', flexDirection: 'column' },
+  itemName: { fontSize: fontSizes.md, color: colors.textPrimary, fontWeight: 500 },
+  itemUsage: { fontSize: fontSizes.xs, color: colors.textMuted },
 
-  itemIcon: {
-    fontSize: fontSizes.lg
-  },
-
-  itemNames: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-
-  itemName: {
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
-    fontWeight: 500
-  },
-
-  itemUsage: {
-    fontSize: fontSizes.xs,
-    color: colors.textMuted
-  },
-
-  itemActions: {
-    display: 'flex',
-    gap: spacing.xs
-  },
+  itemActions: { display: 'flex', gap: spacing.xs },
 
   editButton: {
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: fontSizes.sm,
-    borderRadius: borderRadius.md
+    width: '34px', height: '34px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
+    fontSize: fontSizes.sm, borderRadius: '10px', transition: 'all 0.2s ease'
   },
 
   deleteButton: {
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: fontSizes.sm,
-    borderRadius: borderRadius.md
+    width: '34px', height: '34px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
+    fontSize: fontSizes.sm, borderRadius: '10px', transition: 'all 0.2s ease'
   },
 
-  addButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonPrimary,
-    width: '100%'
-  },
+  addButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary, width: '100%' },
 
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.md
-  },
+  form: { display: 'flex', flexDirection: 'column', gap: spacing.md },
+  field: { display: 'flex', flexDirection: 'column' },
+  input: { ...commonStyles.input, padding: '10px 14px' },
 
-  field: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-
-  input: {
-    ...commonStyles.input,
-    padding: spacing.sm
-  },
-
-  emojiPicker: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: spacing.xs
-  },
+  emojiPicker: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs },
 
   emojiButton: {
-    width: '40px',
-    height: '40px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: '2px solid transparent',
-    borderRadius: borderRadius.md,
-    cursor: 'pointer',
-    fontSize: fontSizes.lg,
-    backgroundColor: 'transparent'
+    width: '42px', height: '42px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '2px solid transparent', borderRadius: '10px',
+    cursor: 'pointer', fontSize: fontSizes.lg, backgroundColor: 'transparent',
+    transition: 'all 0.2s ease'
   },
 
-  formActions: {
-    display: 'flex',
-    gap: spacing.sm,
-    marginTop: spacing.sm
-  },
-
-  cancelButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonSecondary,
-    flex: 1
-  },
-
-  saveButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonPrimary,
-    flex: 1
-  }
+  formActions: { display: 'flex', gap: spacing.sm, marginTop: spacing.sm },
+  cancelButton: { ...commonStyles.buttonBase, ...commonStyles.buttonSecondary, flex: 1 },
+  saveButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary, flex: 1 }
 }

@@ -23,7 +23,7 @@ export default function RecipeCard({ recipe, onClick }) {
             <span style={styles.priceBadge}>{getPriceRangeSymbol(recipe.price_range)}</span>
           )}
           {recipe.difficulty && (
-            <span style={{ ...styles.badge, backgroundColor: getDifficultyColor(recipe.difficulty) + '20', color: getDifficultyColor(recipe.difficulty) }}>
+            <span style={{ ...styles.badge, backgroundColor: getDifficultyColor(recipe.difficulty) + '18', color: getDifficultyColor(recipe.difficulty) }}>
               {t(`difficulty.${recipe.difficulty}`)}
             </span>
           )}
@@ -41,7 +41,7 @@ export default function RecipeCard({ recipe, onClick }) {
       {recipe.seasons && recipe.seasons.length > 0 && (
         <div style={styles.seasons}>
           {recipe.seasons.map(season => (
-            <span key={season} style={{ ...styles.seasonBadge, backgroundColor: getSeasonColor(season) + '20', color: getSeasonColor(season) }}>
+            <span key={season} style={{ ...styles.seasonBadge, backgroundColor: getSeasonColor(season) + '18', color: getSeasonColor(season) }}>
               {getSeasonEmoji(season)} {t(`season.${season}`)}
             </span>
           ))}
@@ -65,21 +65,23 @@ export default function RecipeCard({ recipe, onClick }) {
 
 const styles = {
   card: {
-    backgroundColor: 'white', borderRadius: '12px', padding: '14px 16px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer'
+    backgroundColor: 'white', borderRadius: '16px', padding: '16px 18px',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+    cursor: 'pointer', transition: 'all 0.2s ease',
+    border: '1px solid rgba(0,0,0,0.04)',
   },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: '8px' },
-  titleRow: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 },
-  mealTypeEmoji: { fontSize: '20px', flexShrink: 0 },
-  name: { fontFamily: fonts.heading, fontSize: fontSizes.lg, fontWeight: 600, color: '#2D3436', margin: 0, flex: 1 },
-  badges: { display: 'flex', gap: spacing.xs, flexShrink: 0 },
-  badge: { fontSize: fontSizes.xs, fontWeight: 600, padding: '2px 8px', borderRadius: borderRadius.full, whiteSpace: 'nowrap' },
-  priceBadge: { fontSize: fontSizes.xs, fontWeight: 700, padding: '2px 8px', borderRadius: borderRadius.full, backgroundColor: colors.gold + '25', color: colors.gold },
-  meta: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' },
-  metaItem: { fontSize: '13px', color: '#636E72' },
-  seasons: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginBottom: '6px' },
-  seasonBadge: { fontSize: fontSizes.xs, fontWeight: 600, padding: '2px 8px', borderRadius: borderRadius.full },
-  tags: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginBottom: '6px' },
-  tag: { fontSize: fontSizes.xs, color: '#636E72', backgroundColor: '#F5F7FA', padding: '2px 8px', borderRadius: borderRadius.full },
-  notes: { fontSize: '13px', color: '#636E72', margin: 0, fontStyle: 'italic', lineHeight: 1.4 }
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: '10px' },
+  titleRow: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 },
+  mealTypeEmoji: { fontSize: '22px', flexShrink: 0 },
+  name: { fontFamily: fonts.heading, fontSize: fontSizes.lg, fontWeight: 700, color: colors.textPrimary, margin: 0, flex: 1, letterSpacing: '-0.2px' },
+  badges: { display: 'flex', gap: '6px', flexShrink: 0 },
+  badge: { fontSize: fontSizes.xs, fontWeight: 600, padding: '3px 10px', borderRadius: borderRadius.full, whiteSpace: 'nowrap' },
+  priceBadge: { fontSize: fontSizes.xs, fontWeight: 700, padding: '3px 10px', borderRadius: borderRadius.full, backgroundColor: colors.gold + '1A', color: colors.gold },
+  meta: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' },
+  metaItem: { fontSize: '13px', color: colors.textSecondary },
+  seasons: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' },
+  seasonBadge: { fontSize: fontSizes.xs, fontWeight: 600, padding: '3px 10px', borderRadius: borderRadius.full },
+  tags: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' },
+  tag: { fontSize: fontSizes.xs, color: colors.textSecondary, backgroundColor: colors.background, padding: '3px 10px', borderRadius: borderRadius.full },
+  notes: { fontSize: '13px', color: colors.textMuted, margin: 0, fontStyle: 'italic', lineHeight: 1.5 }
 }

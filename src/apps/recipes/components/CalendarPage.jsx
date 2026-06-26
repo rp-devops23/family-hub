@@ -38,6 +38,14 @@ export default function CalendarPage() {
   const locale = language === 'fr' ? fr : enUS
   const dayHeaders = language === 'fr' ? DAY_HEADERS_FR : DAY_HEADERS_EN
 
+  // Load meal plans when the visible period changes
+  useEffect(() => {
+    const range = viewMode === 'week'
+      ? { start: currentWeekStart, end: endOfWeek(currentWeekStart, { weekStartsOn: 1 }) }
+      : { start: new Date(currentWeekStart.getFullYear(), currentWeekStart.getMonth(), 1), end: new Date(currentWeekStart.getFullYear(), currentWeekStart.getMonth() + 1, 0) }
+    loadMealPlans(format(range.start, 'yyyy-MM-dd'), format(range.end, 'yyyy-MM-dd'))
+  }, [currentWeekStart, viewMode, loadMealPlans])
+
   const getDateRange = () => {
     if (viewMode === 'week') {
       return { start: currentWeekStart, end: endOfWeek(currentWeekStart, { weekStartsOn: 1 }) }
@@ -108,7 +116,7 @@ export default function CalendarPage() {
   // Month view: leading empty cells to align first day
   const monthStartOffset = (start.getDay() + 6) % 7 // Monday-based offset
 
-  // Week view layout: portrait mobile → vertical list, landscape/desktop → horizontal scroll
+  // Week view layout: portrait mobile -> vertical list, landscape/desktop -> horizontal scroll
   const weekIsVertical = isMobile && !isLandscape
 
   return (
@@ -153,7 +161,7 @@ export default function CalendarPage() {
                 <div key={dayStr} style={{
                   ...styles.dayCard,
                   borderLeft: `3px solid ${isToday ? colors.forest : colors.warmGray}`,
-                  backgroundColor: isToday ? colors.forest + '06' : colors.white,
+                  backgroundColor: isToday ? colors.forest + '08' : colors.white,
                 }}>
                   <div style={styles.dayCardHeader} onClick={() => handleDayClick(day)}>
                     <div>
@@ -192,9 +200,9 @@ export default function CalendarPage() {
                     flex: '1 0 0',
                     minWidth: isLandscape ? '80px' : '100px',
                     borderColor: isToday ? colors.forest : colors.warmGray,
-                    backgroundColor: isToday ? colors.forest + '06' : colors.white,
+                    backgroundColor: isToday ? colors.forest + '08' : colors.white,
                   }}>
-                    <div style={{ ...styles.dayColHeader, backgroundColor: isToday ? colors.forest + '12' : 'transparent' }}
+                    <div style={{ ...styles.dayColHeader, backgroundColor: isToday ? colors.forest + '10' : 'transparent' }}
                       onClick={() => handleDayClick(day)}>
                       <span style={{ fontSize: isLandscape ? '10px' : fontSizes.xs, fontWeight: 700, color: isToday ? colors.forest : colors.textPrimary, textTransform: 'capitalize' }}>
                         {format(day, isLandscape ? 'EEE' : 'EEE', { locale })}
@@ -222,11 +230,11 @@ export default function CalendarPage() {
 
       {/* Month view */}
       {viewMode === 'month' && (
-        <div style={{ backgroundColor: colors.white, borderRadius: borderRadius.lg, overflow: 'hidden', boxShadow: shadows.sm }}>
+        <div style={{ backgroundColor: colors.white, borderRadius: '16px', overflow: 'hidden', boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)' }}>
           {/* Day-of-week headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', backgroundColor: colors.forest }}>
             {dayHeaders.map(d => (
-              <div key={d} style={{ padding: '6px 2px', textAlign: 'center', fontSize: '10px', fontWeight: 700, color: 'white' }}>{d}</div>
+              <div key={d} style={{ padding: '8px 2px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'white', letterSpacing: '0.3px' }}>{d}</div>
             ))}
           </div>
 
@@ -234,7 +242,7 @@ export default function CalendarPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '1px', backgroundColor: colors.warmGray }}>
             {/* Padding cells */}
             {Array(monthStartOffset).fill(null).map((_, i) => (
-              <div key={`pad-${i}`} style={{ backgroundColor: '#F9FAFB', minHeight: isMobile ? '50px' : '70px' }} />
+              <div key={`pad-${i}`} style={{ backgroundColor: colors.background, minHeight: isMobile ? '50px' : '70px' }} />
             ))}
 
             {days.map(day => {
@@ -245,7 +253,7 @@ export default function CalendarPage() {
 
               return (
                 <div key={dayStr} style={{
-                  backgroundColor: isExpanded ? colors.forest + '10' : isToday ? colors.forest + '06' : colors.white,
+                  backgroundColor: isExpanded ? colors.forest + '0C' : isToday ? colors.forest + '08' : colors.white,
                   minHeight: isMobile ? '50px' : '70px',
                   display: 'flex', flexDirection: 'column',
                 }}>
@@ -261,8 +269,8 @@ export default function CalendarPage() {
                       color: isToday ? 'white' : colors.textPrimary,
                       backgroundColor: isToday ? colors.forest : 'transparent',
                       borderRadius: '50%',
-                      width: isMobile ? '20px' : '24px',
-                      height: isMobile ? '20px' : '24px',
+                      width: isMobile ? '22px' : '26px',
+                      height: isMobile ? '22px' : '26px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       {format(day, 'd')}
@@ -282,7 +290,7 @@ export default function CalendarPage() {
                     <div style={{ borderTop: `1px solid ${colors.warmGray}`, padding: '4px' }}>
                       {meals.length === 0 ? (
                         <button onClick={() => { setSelectedDate(day); setShowMealPicker(true) }}
-                          style={{ width: '100%', fontSize: '10px', color: colors.forest, border: 'none', background: 'none', cursor: 'pointer', padding: '2px' }}>
+                          style={{ width: '100%', fontSize: '10px', color: colors.forest, border: 'none', background: 'none', cursor: 'pointer', padding: '2px', fontWeight: 600 }}>
                           + {t('calendar.addMeal')}
                         </button>
                       ) : (
@@ -295,7 +303,7 @@ export default function CalendarPage() {
                       )}
                       {meals.length > 0 && (
                         <button onClick={() => { setSelectedDate(day); setShowMealPicker(true) }}
-                          style={{ width: '100%', fontSize: '10px', color: colors.forest, border: 'none', background: 'none', cursor: 'pointer', padding: '2px 0 0' }}>
+                          style={{ width: '100%', fontSize: '10px', color: colors.forest, border: 'none', background: 'none', cursor: 'pointer', padding: '2px 0 0', fontWeight: 600 }}>
                           + {t('calendar.addMeal')}
                         </button>
                       )}
@@ -316,29 +324,29 @@ export default function CalendarPage() {
 }
 
 const styles = {
-  header: { marginBottom: '12px', backgroundColor: 'white', borderRadius: borderRadius.lg, padding: '12px', boxShadow: shadows.sm },
+  header: { marginBottom: '12px', backgroundColor: 'white', borderRadius: '16px', padding: '14px', boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)' },
   navRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' },
-  navBtn: { width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.warmGray}`, backgroundColor: colors.white, borderRadius: borderRadius.md, cursor: 'pointer', fontSize: '16px', flexShrink: 0 },
+  navBtn: { width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${colors.warmGray}`, backgroundColor: colors.white, borderRadius: '12px', cursor: 'pointer', fontSize: '16px', flexShrink: 0, transition: 'all 0.2s ease' },
   navCenter: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
-  rangeText: { fontSize: fontSizes.sm, fontWeight: 600, color: colors.textPrimary, textTransform: 'capitalize', textAlign: 'center' },
-  todayBtn: { padding: '3px 10px', backgroundColor: colors.forest, color: 'white', border: 'none', borderRadius: borderRadius.full, fontSize: fontSizes.xs, cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap' },
+  rangeText: { fontSize: fontSizes.sm, fontWeight: 700, color: colors.textPrimary, textTransform: 'capitalize', textAlign: 'center', letterSpacing: '-0.1px' },
+  todayBtn: { padding: '4px 12px', backgroundColor: colors.forest, color: 'white', border: 'none', borderRadius: borderRadius.full, fontSize: fontSizes.xs, cursor: 'pointer', fontFamily: FONT, whiteSpace: 'nowrap', fontWeight: 600, transition: 'all 0.2s ease' },
   viewToggle: { display: 'flex', gap: '6px' },
-  viewBtn: { flex: 1, padding: '7px', border: `1px solid ${colors.warmGray}`, borderRadius: borderRadius.md, cursor: 'pointer', fontFamily: FONT, fontSize: fontSizes.sm, fontWeight: 600, backgroundColor: colors.white, color: colors.textPrimary, transition: 'all 0.2s' },
+  viewBtn: { flex: 1, padding: '8px', border: `1.5px solid ${colors.warmGray}`, borderRadius: '12px', cursor: 'pointer', fontFamily: FONT, fontSize: fontSizes.sm, fontWeight: 600, backgroundColor: colors.white, color: colors.textPrimary, transition: 'all 0.25s ease' },
   viewBtnActive: { backgroundColor: colors.forest, color: 'white', borderColor: colors.forest },
 
   // Week portrait
-  dayCard: { borderRadius: borderRadius.md, overflow: 'hidden', boxShadow: shadows.sm },
-  dayCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', cursor: 'pointer' },
-  dayCardMeals: { padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: '4px' },
+  dayCard: { borderRadius: '14px', overflow: 'hidden', boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)' },
+  dayCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', cursor: 'pointer' },
+  dayCardMeals: { padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: '4px' },
   dayName: { fontSize: fontSizes.sm, textTransform: 'capitalize', fontFamily: FONT },
   dayDate: { fontSize: fontSizes.xs, color: colors.textMuted, fontFamily: FONT },
-  mealRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', backgroundColor: colors.cream, borderRadius: borderRadius.sm },
-  mealName: { flex: 1, fontSize: fontSizes.sm, color: colors.textPrimary },
+  mealRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', backgroundColor: colors.background, borderRadius: '10px' },
+  mealName: { flex: 1, fontSize: fontSizes.sm, color: colors.textPrimary, fontWeight: 500 },
   deleteBtn: { border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: colors.textMuted, fontSize: '16px', padding: '0 2px', lineHeight: 1 },
-  addBtn: { width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.warmGray}`, backgroundColor: 'white', borderRadius: borderRadius.sm, cursor: 'pointer', color: colors.forest, fontWeight: 700, fontSize: '16px', flexShrink: 0 },
+  addBtn: { width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${colors.warmGray}`, backgroundColor: 'white', borderRadius: '8px', cursor: 'pointer', color: colors.forest, fontWeight: 700, fontSize: '16px', flexShrink: 0, transition: 'all 0.2s ease' },
 
   // Week landscape/desktop columns
-  dayColumn: { display: 'flex', flexDirection: 'column', border: '1px solid', borderRadius: borderRadius.sm, overflow: 'hidden' },
+  dayColumn: { display: 'flex', flexDirection: 'column', border: '1.5px solid', borderRadius: '12px', overflow: 'hidden' },
   dayColHeader: { padding: '6px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer', borderBottom: `1px solid ${colors.warmGray}` },
-  mealChip: { display: 'flex', alignItems: 'center', backgroundColor: colors.cream, borderRadius: '3px', padding: '2px 4px', gap: '2px' },
+  mealChip: { display: 'flex', alignItems: 'center', backgroundColor: colors.background, borderRadius: '6px', padding: '3px 5px', gap: '2px' },
 }

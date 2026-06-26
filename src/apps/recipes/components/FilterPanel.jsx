@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, getSeasonColor } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, borderRadius, shadows, getSeasonColor } from '../lib/theme'
 import { SEASONS, DIFFICULTIES, MEAL_TYPES, PRICE_RANGES, getSeasonEmoji, getMealTypeEmoji, getPriceRangeSymbol } from '../lib/i18n'
 
 export default function FilterPanel({ filters, onChange }) {
@@ -24,8 +24,9 @@ export default function FilterPanel({ filters, onChange }) {
 
   const chip = (active, activeColor) => ({
     ...styles.chip,
-    backgroundColor: active ? activeColor + (activeColor.length === 7 ? '25' : '') : '#F5F7FA',
-    color: active ? activeColor : '#636E72'
+    backgroundColor: active ? activeColor + (activeColor.length === 7 ? '1A' : '') : colors.background,
+    color: active ? activeColor : colors.textSecondary,
+    borderColor: active ? activeColor + '40' : 'transparent'
   })
 
   return (
@@ -69,7 +70,7 @@ export default function FilterPanel({ filters, onChange }) {
             <div style={styles.chipGroup}>
               {SEASONS.map(season => (
                 <button key={season} type="button" onClick={() => toggle('seasons', season)}
-                  style={{ ...styles.chip, backgroundColor: filters.seasons.includes(season) ? getSeasonColor(season) + '30' : '#F5F7FA', color: filters.seasons.includes(season) ? getSeasonColor(season) : '#636E72' }}>
+                  style={{ ...styles.chip, backgroundColor: filters.seasons.includes(season) ? getSeasonColor(season) + '1A' : colors.background, color: filters.seasons.includes(season) ? getSeasonColor(season) : colors.textSecondary, borderColor: filters.seasons.includes(season) ? getSeasonColor(season) + '40' : 'transparent' }}>
                   {getSeasonEmoji(season)} {t(`season.${season}`)}
                 </button>
               ))}
@@ -145,21 +146,21 @@ const styles = {
   container: { marginBottom: '12px' },
   toggleButton: {
     width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '10px 14px', backgroundColor: 'white', border: 'none', borderRadius: '10px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', fontFamily: fonts.body,
-    fontSize: '14px', color: '#636E72'
+    padding: '12px 16px', backgroundColor: 'white', border: '1px solid rgba(0,0,0,0.04)',
+    borderRadius: '14px', boxShadow: shadows.sm, cursor: 'pointer', fontFamily: fonts.body,
+    fontSize: '14px', color: colors.textSecondary, transition: 'all 0.2s ease'
   },
-  toggleText: { display: 'flex', alignItems: 'center', gap: '6px' },
+  toggleText: { display: 'flex', alignItems: 'center', gap: '8px' },
   badge: {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.forest, color: 'white', fontSize: '10px', fontWeight: '700',
-    width: '18px', height: '18px', borderRadius: '9px'
+    width: '20px', height: '20px', borderRadius: '10px'
   },
-  arrow: { fontSize: '10px', color: '#636E72', transition: 'transform 0.2s ease' },
-  panel: { marginTop: '8px', padding: '16px', backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
-  section: { marginBottom: '14px' },
-  sectionLabel: { display: 'block', fontSize: '11px', fontWeight: 600, color: '#636E72', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  arrow: { fontSize: '10px', color: colors.textMuted, transition: 'transform 0.25s ease' },
+  panel: { marginTop: '8px', padding: '18px', backgroundColor: 'white', borderRadius: '14px', boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)' },
+  section: { marginBottom: '16px' },
+  sectionLabel: { display: 'block', fontSize: '11px', fontWeight: 700, color: colors.textMuted, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.6px' },
   chipGroup: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
-  chip: { padding: '5px 10px', borderRadius: borderRadius.full, border: 'none', fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', transition: 'all 0.2s ease' },
-  clearButton: { width: '100%', padding: '8px', backgroundColor: '#F5F7FA', border: 'none', borderRadius: '8px', color: '#636E72', fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', marginTop: '4px' }
+  chip: { padding: '6px 12px', borderRadius: borderRadius.full, border: '1.5px solid transparent', fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', transition: 'all 0.2s ease', fontWeight: 500 },
+  clearButton: { width: '100%', padding: '10px', backgroundColor: colors.background, border: 'none', borderRadius: '12px', color: colors.textSecondary, fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', marginTop: '4px', fontWeight: 500, transition: 'all 0.2s ease' }
 }

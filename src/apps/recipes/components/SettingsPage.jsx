@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, commonStyles } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
 import TagBaseManager from './TagBaseManager'
 
 export default function SettingsPage() {
@@ -45,7 +45,7 @@ export default function SettingsPage() {
               onClick={() => handleLanguageChange('fr')}
               style={{
                 ...styles.langButton,
-                backgroundColor: language === 'fr' ? colors.forest : colors.warmGray,
+                backgroundColor: language === 'fr' ? colors.forest : colors.background,
                 color: language === 'fr' ? colors.white : colors.textPrimary
               }}
             >
@@ -55,7 +55,7 @@ export default function SettingsPage() {
               onClick={() => handleLanguageChange('en')}
               style={{
                 ...styles.langButton,
-                backgroundColor: language === 'en' ? colors.forest : colors.warmGray,
+                backgroundColor: language === 'en' ? colors.forest : colors.background,
                 color: language === 'en' ? colors.white : colors.textPrimary
               }}
             >
@@ -133,10 +133,6 @@ export default function SettingsPage() {
   )
 }
 
-// ============================================
-// STYLES
-// ============================================
-
 const styles = {
   container: {
     padding: spacing.md
@@ -150,7 +146,9 @@ const styles = {
     fontFamily: fonts.heading,
     fontSize: fontSizes['2xl'],
     color: colors.forest,
-    margin: 0
+    margin: 0,
+    fontWeight: 800,
+    letterSpacing: '-0.3px'
   },
 
   greeting: {
@@ -163,14 +161,15 @@ const styles = {
   section: {
     display: 'flex',
     flexDirection: 'column',
-    gap: spacing.md
+    gap: '10px'
   },
 
   card: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
+    borderRadius: '16px',
     padding: spacing.md,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+    boxShadow: shadows.sm,
+    border: '1px solid rgba(0,0,0,0.04)'
   },
 
   cardButton: {
@@ -178,20 +177,21 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
+    borderRadius: '16px',
     padding: spacing.md,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-    border: 'none',
+    boxShadow: shadows.sm,
+    border: '1px solid rgba(0,0,0,0.04)',
     cursor: 'pointer',
     fontFamily: fonts.body,
     textAlign: 'left',
-    width: '100%'
+    width: '100%',
+    transition: 'all 0.2s ease'
   },
 
   cardHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm
+    gap: '10px'
   },
 
   cardIcon: {
@@ -213,13 +213,14 @@ const styles = {
   languageButtons: {
     display: 'flex',
     gap: spacing.sm,
-    marginTop: spacing.sm
+    marginTop: '10px'
   },
 
   langButton: {
     ...commonStyles.buttonBase,
     flex: 1,
-    padding: `${spacing.sm} ${spacing.md}`
+    padding: `${spacing.sm} ${spacing.md}`,
+    borderRadius: '12px'
   },
 
   logoutButton: {
@@ -228,7 +229,8 @@ const styles = {
     padding: spacing.md,
     backgroundColor: colors.white,
     color: colors.error,
-    border: `1px solid ${colors.error}`,
-    marginTop: spacing.md
+    border: `1.5px solid ${colors.error}`,
+    marginTop: spacing.md,
+    borderRadius: '16px'
   }
 }
