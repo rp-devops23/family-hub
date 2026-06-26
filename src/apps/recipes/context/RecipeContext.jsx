@@ -4,6 +4,7 @@ import {
   getTags, createTag as apiCreateTag, updateTag as apiUpdateTag, deleteTag as apiDeleteTag,
   getBases, createBase as apiCreateBase, updateBase as apiUpdateBase, deleteBase as apiDeleteBase,
   getCuisines,
+  getIngredientCategories, createIngredientCategory as apiCreateIngredientCategory, updateIngredientCategory as apiUpdateIngredientCategory, deleteIngredientCategory as apiDeleteIngredientCategory,
   getIngredients, createIngredient as apiCreateIngredient, updateIngredient as apiUpdateIngredient, deleteIngredient as apiDeleteIngredient,
   getRecipes, createRecipe as apiCreateRecipe, updateRecipe as apiUpdateRecipe, deleteRecipe as apiDeleteRecipe,
   getMealPlans, createMealPlan as apiCreateMealPlan, deleteMealPlan as apiDeleteMealPlan,
@@ -30,6 +31,7 @@ export function RecipeProvider({ children }) {
   const [tags, setTags] = useState([])
   const [bases, setBases] = useState([])
   const [cuisines, setCuisines] = useState([])
+  const [ingredientCategories, setIngredientCategories] = useState([])
   const [ingredients, setIngredients] = useState([])
   const [recipes, setRecipes] = useState([])
   const [mealPlans, setMealPlans] = useState([])
@@ -53,7 +55,7 @@ export function RecipeProvider({ children }) {
 
   useEffect(() => {
     if (!user) {
-      setProfile(null); setTags([]); setBases([]); setIngredients([])
+      setProfile(null); setTags([]); setBases([]); setIngredientCategories([]); setIngredients([])
       setRecipes([]); setMealPlans([]); setShoppingItems([])
       return
     }
@@ -61,13 +63,13 @@ export function RecipeProvider({ children }) {
     async function loadUserData() {
       setDataLoading(true)
       try {
-        const [profileData, tagsData, basesData, cuisinesData, ingredientsData, recipesData, shoppingData] = await Promise.all([
+        const [profileData, tagsData, basesData, cuisinesData, ingredientCategoriesData, ingredientsData, recipesData, shoppingData] = await Promise.all([
           getProfile(user.id), getTags(user.id), getBases(user.id), getCuisines(),
-          getIngredients(user.id), getRecipes(user.id), getShoppingItems(user.id)
+          getIngredientCategories(user.id), getIngredients(user.id), getRecipes(user.id), getShoppingItems(user.id)
         ])
         if (mounted) {
           setProfile(profileData); setTags(tagsData); setBases(basesData)
-          setCuisines(cuisinesData); setIngredients(ingredientsData)
+          setCuisines(cuisinesData); setIngredientCategories(ingredientCategoriesData); setIngredients(ingredientsData)
           setRecipes(recipesData); setShoppingItems(shoppingData)
         }
       } catch (error) {
@@ -124,6 +126,30 @@ export function RecipeProvider({ children }) {
     await apiDeleteBase(baseId)
     setBases(prev => prev.filter(b => b.id !== baseId))
     setRecipes(prev => prev.map(r => r.base_id === baseId ? { ...r, base_id: null, base: null } : r))
+  }, [])
+
+  // ============================================
+  // INGREDIENT CATEGORY ACTIONS
+  // ============================================
+
+  const createIngredientCategory = useCallback(async (categoryData) => {
+    if (!user) return
+    const newCategory = await apiCreateIngredientCategory(user.id, categoryData)
+    setIngredientCategories(prev => [...prev, newCategory].sort((a, b) => a.sort_order - b.sort_order))
+    return newCategory
+  }, [user])
+
+  const updateIngredientCategory = useCallback(async (categoryId, categoryData) => {
+    const updated = await apiUpdateIngredientCategory(categoryId, categoryData)
+    setIngredientCategories(prev => prev.map(c => c.id === categoryId ? updated : c))
+    return updated
+  }, [])
+
+  const deleteIngredientCategory = useCallback(async (categoryId) => {
+    await apiDeleteIngredientCategory(categoryId)
+    setIngredientCategories(prev => prev.filter(c => c.id !== categoryId))
+    // Clear category_id on affected ingredients
+    setIngredients(prev => prev.map(i => i.category_id === categoryId ? { ...i, category_id: null, category: null } : i))
   }, [])
 
   // ============================================
@@ -249,7 +275,7 @@ export function RecipeProvider({ children }) {
     updateLanguage,
 
     // Recipe data
-    profile, tags, bases, cuisines, ingredients, recipes, mealPlans, shoppingItems, dataLoading,
+    profile, tags, bases, cuisines, ingredientCategories, ingredients, recipes, mealPlans, shoppingItems, dataLoading,
 
     // UI
     currentTab, setCurrentTab,
@@ -259,6 +285,9 @@ export function RecipeProvider({ children }) {
 
     // Base actions
     createBase, updateBase, deleteBase,
+
+    // Ingredient category actions
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
 
     // Ingredient actions
     createIngredient, updateIngredient, deleteIngredient,
@@ -274,10 +303,11 @@ export function RecipeProvider({ children }) {
     deleteShoppingItem, deleteCheckedShoppingItems, deleteAllShoppingItems,
   }), [
     auth, t, getName, updateLanguage,
-    profile, tags, bases, cuisines, ingredients, recipes, mealPlans, shoppingItems, dataLoading,
+    profile, tags, bases, cuisines, ingredientCategories, ingredients, recipes, mealPlans, shoppingItems, dataLoading,
     currentTab,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
     createIngredient, updateIngredient, deleteIngredient,
     createRecipe, updateRecipe, deleteRecipe,
     loadMealPlans, createMealPlan, deleteMealPlan,

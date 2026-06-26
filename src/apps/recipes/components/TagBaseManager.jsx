@@ -4,26 +4,31 @@ import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles 
 
 // Common emoji picker options
 const EMOJI_OPTIONS = ['🏷️', '⚡', '👶', '🥬', '🌱', '🍖', '🐟', '🌶️', '❤️', '⭐', '🔥', '🧀', '🥗', '🍝', '🍜', '🥘', '🍰', '🎉']
+const CATEGORY_EMOJI_OPTIONS = ['🥬', '🍖', '🧀', '🍚', '🥫', '🍺', '❄️', '🧴', '🍞', '🥚', '🫒', '🧂', '🍫', '🐟', '🥜', '🧁', '🌿', '🛒']
 
 export default function TagBaseManager({ type, onClose }) {
   const {
     t, getName, language,
-    tags, bases, ingredients, recipes,
+    tags, bases, ingredients, ingredientCategories, recipes,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
     createIngredient, updateIngredient, deleteIngredient
   } = useApp()
 
   const isTag = type === 'tag'
   const isBase = type === 'base'
   const isIngredient = type === 'ingredient'
+  const isCategory = type === 'ingredientCategory'
 
-  const items = isTag ? tags : isBase ? bases : ingredients
+  const items = isTag ? tags : isBase ? bases : isCategory ? ingredientCategories : ingredients
   const title = isTag
     ? t('manage.tags.title')
     : isBase
       ? t('manage.bases.title')
-      : t('manage.ingredients.title')
+      : isCategory
+        ? t('manage.ingredientCategories.title')
+        : t('manage.ingredients.title')
 
   const [editingItem, setEditingItem] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -33,6 +38,7 @@ export default function TagBaseManager({ type, onClose }) {
   const [nameFr, setNameFr] = useState('')
   const [nameEn, setNameEn] = useState('')
   const [icon, setIcon] = useState('🏷️')
+  const [categoryId, setCategoryId] = useState('')
 
   // Count recipes using an item
   const getUsageCount = (itemId) => {
@@ -42,6 +48,8 @@ export default function TagBaseManager({ type, onClose }) {
       ).length
     } else if (isBase) {
       return recipes.filter(r => r.base_id === itemId).length
+    } else if (isCategory) {
+      return ingredients.filter(i => i.category_id === itemId).length
     } else {
       return recipes.filter(r =>
         r.recipe_ingredients?.some(ri => ri.ingredient_id === itemId)
@@ -54,7 +62,8 @@ export default function TagBaseManager({ type, onClose }) {
     setEditingItem(null)
     setNameFr('')
     setNameEn('')
-    setIcon('🏷️')
+    setIcon(isCategory ? '🥬' : '🏷️')
+    setCategoryId('')
     setShowForm(true)
   }
 
@@ -63,8 +72,11 @@ export default function TagBaseManager({ type, onClose }) {
     setEditingItem(item)
     setNameFr(item.name_fr)
     setNameEn(item.name_en)
-    if (isTag) {
-      setIcon(item.icon)
+    if (isTag || isCategory) {
+      setIcon(item.icon || '🏷️')
+    }
+    if (isIngredient) {
+      setCategoryId(item.category_id || '')
     }
     setShowForm(true)
   }
@@ -84,7 +96,8 @@ export default function TagBaseManager({ type, onClose }) {
       const data = {
         name_fr: nameFr.trim(),
         name_en: nameEn.trim(),
-        ...(isTag && { icon })
+        ...((isTag || isCategory) && { icon }),
+        ...(isIngredient && { category_id: categoryId || null })
       }
 
       if (editingItem) {
@@ -92,6 +105,8 @@ export default function TagBaseManager({ type, onClose }) {
           await updateTag(editingItem.id, data)
         } else if (isBase) {
           await updateBase(editingItem.id, data)
+        } else if (isCategory) {
+          await updateIngredientCategory(editingItem.id, data)
         } else {
           await updateIngredient(editingItem.id, data)
         }
@@ -100,6 +115,8 @@ export default function TagBaseManager({ type, onClose }) {
           await createTag(data)
         } else if (isBase) {
           await createBase(data)
+        } else if (isCategory) {
+          await createIngredientCategory(data)
         } else {
           await createIngredient(data)
         }
@@ -116,7 +133,7 @@ export default function TagBaseManager({ type, onClose }) {
   const handleDelete = async (item) => {
     const usageCount = getUsageCount(item.id)
     const message = usageCount > 0
-      ? `${t('manage.deleteConfirm')} ${t('manage.inUse', { count: usageCount })}`
+      ? `${t('manage.deleteConfirm')} ${isCategory ? t('manage.inUseIngredients', { count: usageCount }) : t('manage.inUse', { count: usageCount })}`
       : t('manage.deleteConfirm')
 
     if (!window.confirm(message)) return
@@ -126,12 +143,21 @@ export default function TagBaseManager({ type, onClose }) {
         await deleteTag(item.id)
       } else if (isBase) {
         await deleteBase(item.id)
+      } else if (isCategory) {
+        await deleteIngredientCategory(item.id)
       } else {
         await deleteIngredient(item.id)
       }
     } catch (error) {
       console.error('Delete error:', error)
     }
+  }
+
+  // Get category name for an ingredient
+  const getCategoryLabel = (item) => {
+    if (!isIngredient || !item.category_id) return null
+    const cat = ingredientCategories.find(c => c.id === item.category_id)
+    return cat ? `${cat.icon || ''} ${getName(cat)}`.trim() : null
   }
 
   return (
@@ -151,15 +177,21 @@ export default function TagBaseManager({ type, onClose }) {
               <div style={styles.list}>
                 {items.map(item => {
                   const usageCount = getUsageCount(item.id)
+                  const catLabel = getCategoryLabel(item)
                   return (
                     <div key={item.id} style={styles.item}>
                       <div style={styles.itemInfo}>
-                        {isTag && <span style={styles.itemIcon}>{item.icon}</span>}
+                        {(isTag || isCategory) && <span style={styles.itemIcon}>{item.icon}</span>}
                         <div style={styles.itemNames}>
                           <span style={styles.itemName}>{getName(item)}</span>
+                          {catLabel && (
+                            <span style={styles.itemCategory}>{catLabel}</span>
+                          )}
                           {usageCount > 0 && (
                             <span style={styles.itemUsage}>
-                              {t('manage.inUse', { count: usageCount })}
+                              {isCategory
+                                ? t('manage.inUseIngredients', { count: usageCount })
+                                : t('manage.inUse', { count: usageCount })}
                             </span>
                           )}
                         </div>
@@ -192,12 +224,12 @@ export default function TagBaseManager({ type, onClose }) {
           {/* Form */}
           {showForm && (
             <div style={styles.form}>
-              {/* Icon picker (tags only) */}
-              {isTag && (
+              {/* Icon picker (tags and categories) */}
+              {(isTag || isCategory) && (
                 <div style={styles.field}>
                   <label style={commonStyles.label}>{t('manage.icon')}</label>
                   <div style={styles.emojiPicker}>
-                    {EMOJI_OPTIONS.map(emoji => (
+                    {(isCategory ? CATEGORY_EMOJI_OPTIONS : EMOJI_OPTIONS).map(emoji => (
                       <button
                         key={emoji}
                         type="button"
@@ -239,6 +271,25 @@ export default function TagBaseManager({ type, onClose }) {
                   placeholder="Ex: Vegetarian"
                 />
               </div>
+
+              {/* Category picker (ingredients only) */}
+              {isIngredient && ingredientCategories.length > 0 && (
+                <div style={styles.field}>
+                  <label style={commonStyles.label}>{t('manage.category')}</label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="">{t('manage.category.none')}</option>
+                    {ingredientCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {getName(cat)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Form actions */}
               <div style={styles.formActions}>
@@ -318,6 +369,7 @@ const styles = {
   itemIcon: { fontSize: fontSizes.lg },
   itemNames: { display: 'flex', flexDirection: 'column' },
   itemName: { fontSize: fontSizes.md, color: colors.textPrimary, fontWeight: 500 },
+  itemCategory: { fontSize: fontSizes.xs, color: colors.forest, fontWeight: 500 },
   itemUsage: { fontSize: fontSizes.xs, color: colors.textMuted },
 
   itemActions: { display: 'flex', gap: spacing.xs },
@@ -341,6 +393,10 @@ const styles = {
   form: { display: 'flex', flexDirection: 'column', gap: spacing.md },
   field: { display: 'flex', flexDirection: 'column' },
   input: { ...commonStyles.input, padding: '10px 14px' },
+  select: {
+    ...commonStyles.input, padding: '10px 14px',
+    appearance: 'auto', cursor: 'pointer'
+  },
 
   emojiPicker: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs },
 

@@ -90,23 +90,50 @@ export async function getCuisines() {
 }
 
 // ============================================
+// INGREDIENT CATEGORIES
+// ============================================
+
+export async function getIngredientCategories(userId) {
+  const { data, error } = await supabase.from('ingredient_categories').select('*').eq('user_id', userId).order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function createIngredientCategory(userId, category) {
+  const { data, error } = await supabase.from('ingredient_categories').insert({ user_id: userId, ...category }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateIngredientCategory(categoryId, updates) {
+  const { data, error } = await supabase.from('ingredient_categories').update(updates).eq('id', categoryId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteIngredientCategory(categoryId) {
+  const { error } = await supabase.from('ingredient_categories').delete().eq('id', categoryId)
+  if (error) throw error
+}
+
+// ============================================
 // INGREDIENTS
 // ============================================
 
 export async function getIngredients(userId) {
-  const { data, error } = await supabase.from('ingredients').select('*').eq('user_id', userId).order('name_fr', { ascending: true })
+  const { data, error } = await supabase.from('ingredients').select('*, category:ingredient_categories(*)').eq('user_id', userId).order('name_fr', { ascending: true })
   if (error) throw error
   return data
 }
 
 export async function createIngredient(userId, ingredient) {
-  const { data, error } = await supabase.from('ingredients').insert({ user_id: userId, ...ingredient }).select().single()
+  const { data, error } = await supabase.from('ingredients').insert({ user_id: userId, ...ingredient }).select('*, category:ingredient_categories(*)').single()
   if (error) throw error
   return data
 }
 
 export async function updateIngredient(ingredientId, updates) {
-  const { data, error } = await supabase.from('ingredients').update(updates).eq('id', ingredientId).select().single()
+  const { data, error } = await supabase.from('ingredients').update(updates).eq('id', ingredientId).select('*, category:ingredient_categories(*)').single()
   if (error) throw error
   return data
 }

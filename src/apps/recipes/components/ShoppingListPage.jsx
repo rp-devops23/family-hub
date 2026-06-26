@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { colors, shadows } from '../lib/theme'
 import ShoppingListGenerator from './ShoppingListGenerator'
@@ -14,61 +14,150 @@ function getItemName(item, language) {
   return item.name || item.custom_name || '?'
 }
 
+function getItemCategoryId(item, ingredients) {
+  if (item.ingredient_id) {
+    // Use the ingredient's category from the full ingredients list (has category join)
+    const fullIngredient = ingredients.find(i => i.id === item.ingredient_id)
+    return fullIngredient?.category_id || null
+  }
+  return null
+}
+
 export default function ShoppingListPage() {
-  const { t, language, shoppingItems, createShoppingItem, updateShoppingItem, deleteShoppingItem, recipes } = useApp()
+  const { t, language, getName, shoppingItems, ingredients, ingredientCategories, createShoppingItem, createIngredient, updateShoppingItem, deleteShoppingItem } = useApp()
 
   const [showGenerator, setShowGenerator] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [inputValue, setInputValue] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [customInput, setCustomInput] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [adding, setAdding] = useState(false)
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const inputRef = useRef(null)
+  const suggestionsRef = useRef(null)
 
   const uncheckedItems = shoppingItems.filter(item => !item.checked)
   const checkedItems = shoppingItems.filter(item => item.checked)
 
-  const getAvailableIngredients = () => {
-    const used = new Set(uncheckedItems.map(item => item.ingredient_id).filter(Boolean))
-    return recipes
-      .flatMap(r => r.recipe_ingredients || [])
-      .map(ri => ({
-        id: ri.ingredient_id,
-        name: language === 'fr'
-          ? ri.ingredient?.name_fr || ri.ingredient?.name_en
-          : ri.ingredient?.name_en || ri.ingredient?.name_fr
-      }))
-      .filter(ing => ing.id && ing.name && !used.has(ing.id))
-      .filter((ing, idx, arr) => arr.findIndex(i => i.id === ing.id) === idx)
-  }
-
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      setSuggestions(
-        getAvailableIngredients()
-          .filter(ing => ing.name.toLowerCase().includes(query))
-          .slice(0, 5)
-      )
-      setShowSuggestions(true)
-    } else {
-      setShowSuggestions(false)
+  // Group unchecked items by category
+  const groupedItems = useMemo(() => {
+    if (ingredientCategories.length === 0) {
+      return [{ category: null, items: uncheckedItems }]
     }
-  }, [searchQuery, shoppingItems])
 
-  const handleAddCustomItem = async () => {
-    const input = customInput.trim()
-    if (!input) return
-    try {
-      await createShoppingItem({ name: input, quantity: null, unit: null })
-      setCustomInput('')
-    } catch (error) { console.error('Add item error:', error) }
-  }
+    const groups = new Map()
+    // Initialize groups in sort_order
+    for (const cat of ingredientCategories) {
+      groups.set(cat.id, { category: cat, items: [] })
+    }
+    groups.set(null, { category: null, items: [] }) // uncategorized last
 
-  const handleAddIngredient = async (suggestion) => {
+    for (const item of uncheckedItems) {
+      const catId = getItemCategoryId(item, ingredients)
+      const group = groups.get(catId) || groups.get(null)
+      group.items.push(item)
+    }
+
+    // Return only non-empty groups
+    return Array.from(groups.values()).filter(g => g.items.length > 0)
+  }, [uncheckedItems, ingredientCategories, ingredients])
+
+  // Search all user ingredients, not just recipe ones
+  useEffect(() => {
+    const query = inputValue.trim().toLowerCase()
+    if (!query) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      setHighlightedIndex(-1)
+      return
+    }
+    const alreadyInList = new Set(shoppingItems.filter(i => !i.checked).map(i => i.ingredient_id).filter(Boolean))
+    const matches = ingredients
+      .filter(ing => {
+        const nameFr = (ing.name_fr || '').toLowerCase()
+        const nameEn = (ing.name_en || '').toLowerCase()
+        return (nameFr.includes(query) || nameEn.includes(query)) && !alreadyInList.has(ing.id)
+      })
+      .map(ing => {
+        const cat = ing.category_id ? ingredientCategories.find(c => c.id === ing.category_id) : null
+        return {
+          id: ing.id,
+          name: language === 'fr' ? ing.name_fr || ing.name_en : ing.name_en || ing.name_fr,
+          categoryLabel: cat ? `${cat.icon || ''} ${getName(cat)}`.trim() : null,
+          existing: true
+        }
+      })
+      .slice(0, 6)
+    const exactMatch = matches.some(m => m.name.toLowerCase() === query)
+    setSuggestions(matches)
+    setShowSuggestions(true)
+    setHighlightedIndex(exactMatch ? matches.findIndex(m => m.name.toLowerCase() === query) : -1)
+  }, [inputValue, ingredients, shoppingItems, language, ingredientCategories, getName])
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target) &&
+          inputRef.current && !inputRef.current.contains(e.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleAddExistingIngredient = async (ingredient) => {
     try {
-      await createShoppingItem({ ingredient_id: suggestion.id, name: suggestion.name, quantity: null, unit: null })
-      setSearchQuery('')
+      setAdding(true)
+      await createShoppingItem({ ingredient_id: ingredient.id, name: ingredient.name, quantity: null, unit: null })
+      setInputValue('')
       setShowSuggestions(false)
     } catch (error) { console.error('Add ingredient error:', error) }
+    finally { setAdding(false) }
+  }
+
+  const handleAddNewIngredient = async () => {
+    const name = inputValue.trim()
+    if (!name || adding) return
+    try {
+      setAdding(true)
+      const newIngredient = await createIngredient({
+        name_fr: name,
+        name_en: name,
+        category_id: selectedCategoryId || null
+      })
+      await createShoppingItem({ ingredient_id: newIngredient.id, name, quantity: null, unit: null })
+      setInputValue('')
+      setShowSuggestions(false)
+      setSelectedCategoryId('')
+    } catch (error) { console.error('Add new ingredient error:', error) }
+    finally { setAdding(false) }
+  }
+
+  const handleKeyDown = (e) => {
+    if (!showSuggestions) {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleAddNewIngredient()
+      }
+      return
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlightedIndex(prev => prev < suggestions.length ? prev + 1 : 0)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlightedIndex(prev => prev > 0 ? prev - 1 : suggestions.length)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+        handleAddExistingIngredient(suggestions[highlightedIndex])
+      } else {
+        handleAddNewIngredient()
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+    }
   }
 
   const handleToggleItem = async (item) => {
@@ -103,44 +192,108 @@ export default function ShoppingListPage() {
     catch (error) { console.error('Clear all error:', error) }
   }
 
+  const showCreateOption = inputValue.trim() && !suggestions.some(s => s.name.toLowerCase() === inputValue.trim().toLowerCase())
+
+  const renderItem = (item) => (
+    <div key={item.id} style={styles.item}>
+      <input type="checkbox" checked={false} onChange={() => handleToggleItem(item)} style={styles.checkbox} />
+      <div style={styles.itemContent}>
+        <span style={styles.itemName}>{getItemName(item, language)}</span>
+      </div>
+      <div style={styles.qtyRow}>
+        <input
+          type="text"
+          value={item.quantity || ''}
+          onChange={e => handleUpdateQuantity(item.id, e.target.value)}
+          placeholder={t('shopping.quantity')}
+          style={styles.qtyInput}
+        />
+        <input
+          type="text"
+          value={item.unit || ''}
+          onChange={e => handleUpdateUnit(item.id, e.target.value)}
+          placeholder={t('shopping.unit')}
+          style={styles.unitInput}
+        />
+      </div>
+      <button onClick={() => handleDeleteItem(item.id)} style={styles.deleteBtn}>✕</button>
+    </div>
+  )
+
   return (
     <div style={styles.container}>
 
-      {/* Add item row */}
+      {/* Unified search + add bar */}
       <div style={styles.addRow}>
         <div style={styles.searchBar}>
           <span style={styles.searchIcon}>🔍</span>
           <input
+            ref={inputRef}
             type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder={t('shopping.searchPlaceholder')}
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => inputValue.trim() && setShowSuggestions(true)}
+            placeholder={t('shopping.unifiedPlaceholder')}
             style={styles.searchInput}
+            disabled={adding}
           />
-          {showSuggestions && suggestions.length > 0 && (
-            <div style={styles.suggestions}>
-              {suggestions.map(sugg => (
-                <button key={sugg.id} onClick={() => handleAddIngredient(sugg)} style={styles.suggestionItem}>
-                  + {sugg.name}
+          {inputValue.trim() && (
+            <button
+              onClick={() => { setInputValue(''); setShowSuggestions(false) }}
+              style={styles.clearInputBtn}
+            >✕</button>
+          )}
+          {showSuggestions && (suggestions.length > 0 || showCreateOption) && (
+            <div ref={suggestionsRef} style={styles.suggestions}>
+              {suggestions.map((sugg, idx) => (
+                <button
+                  key={sugg.id}
+                  onClick={() => handleAddExistingIngredient(sugg)}
+                  style={{
+                    ...styles.suggestionItem,
+                    backgroundColor: highlightedIndex === idx ? colors.background : 'white'
+                  }}
+                >
+                  <span style={styles.suggestionPlus}>+</span>
+                  <span style={styles.suggestionText}>
+                    {sugg.name}
+                    {sugg.categoryLabel && <span style={styles.suggestionCategory}>{sugg.categoryLabel}</span>}
+                  </span>
                 </button>
               ))}
+              {showCreateOption && (
+                <div style={styles.createNewSection}>
+                  <button
+                    onClick={handleAddNewIngredient}
+                    style={{
+                      ...styles.suggestionItem,
+                      ...styles.createNewItem,
+                      backgroundColor: highlightedIndex === suggestions.length ? colors.background : 'white'
+                    }}
+                  >
+                    <span style={styles.createNewIcon}>✦</span> {t('shopping.createNew')} « {inputValue.trim()} »
+                  </button>
+                  {ingredientCategories.length > 0 && (
+                    <select
+                      value={selectedCategoryId}
+                      onChange={e => setSelectedCategoryId(e.target.value)}
+                      style={styles.categorySelectorInline}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <option value="">{t('shopping.selectCategory')}</option>
+                      {ingredientCategories.map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.icon} {getName(cat)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
-      </div>
-
-      <div style={styles.customRow}>
-        <input
-          type="text"
-          value={customInput}
-          onChange={e => setCustomInput(e.target.value)}
-          onKeyPress={e => e.key === 'Enter' && handleAddCustomItem()}
-          placeholder={t('shopping.customItemPlaceholder')}
-          style={styles.customInput}
-        />
-        <button onClick={handleAddCustomItem} style={styles.addButton}>
-          {t('common.add')}
-        </button>
       </div>
 
       <button onClick={() => setShowGenerator(true)} style={styles.generatorButton}>
@@ -153,39 +306,23 @@ export default function ShoppingListPage() {
         </div>
       ) : (
         <>
-          {/* Unchecked items */}
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
-              <span style={styles.sectionTitle}>{t('shopping.items')} ({uncheckedItems.length})</span>
+          {/* Unchecked items grouped by category */}
+          {groupedItems.map(({ category, items }) => (
+            <div key={category?.id || 'uncategorized'} style={styles.section}>
+              <div style={styles.categoryHeader}>
+                <span style={styles.categoryTitle}>
+                  {category
+                    ? `${category.icon || ''} ${getName(category)}`.trim()
+                    : t('shopping.uncategorized')
+                  }
+                </span>
+                <span style={styles.categoryCount}>{items.length}</span>
+              </div>
+              <div style={styles.list}>
+                {items.map(renderItem)}
+              </div>
             </div>
-            <div style={styles.list}>
-              {uncheckedItems.map(item => (
-                <div key={item.id} style={styles.item}>
-                  <input type="checkbox" checked={false} onChange={() => handleToggleItem(item)} style={styles.checkbox} />
-                  <div style={styles.itemContent}>
-                    <span style={styles.itemName}>{getItemName(item, language)}</span>
-                  </div>
-                  <div style={styles.qtyRow}>
-                    <input
-                      type="text"
-                      value={item.quantity || ''}
-                      onChange={e => handleUpdateQuantity(item.id, e.target.value)}
-                      placeholder={t('shopping.quantity')}
-                      style={styles.qtyInput}
-                    />
-                    <input
-                      type="text"
-                      value={item.unit || ''}
-                      onChange={e => handleUpdateUnit(item.id, e.target.value)}
-                      placeholder={t('shopping.unit')}
-                      style={styles.unitInput}
-                    />
-                  </div>
-                  <button onClick={() => handleDeleteItem(item.id)} style={styles.deleteBtn}>✕</button>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
 
           {/* Checked items */}
           {checkedItems.length > 0 && (
@@ -225,30 +362,42 @@ const styles = {
   searchBar: {
     display: 'flex', alignItems: 'center', gap: '10px',
     backgroundColor: 'white', borderRadius: '14px', padding: '12px 16px',
-    boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)'
+    boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)', position: 'relative'
   },
   searchIcon: { fontSize: '16px', opacity: 0.6 },
   searchInput: { flex: 1, border: 'none', outline: 'none', fontSize: '15px', backgroundColor: 'transparent', fontFamily: FONT, color: colors.textPrimary },
+  clearInputBtn: {
+    border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px',
+    color: colors.textMuted, padding: '4px 6px', borderRadius: '50%'
+  },
   suggestions: {
     position: 'absolute', top: '100%', left: 0, right: 0,
     backgroundColor: 'white', borderRadius: '0 0 14px 14px',
-    boxShadow: shadows.md, zIndex: 10, maxHeight: '150px', overflowY: 'auto'
+    boxShadow: shadows.md, zIndex: 10, maxHeight: '280px', overflowY: 'auto',
+    borderTop: '1px solid ' + colors.warmGray
   },
   suggestionItem: {
     width: '100%', padding: '12px 16px', backgroundColor: 'white', border: 'none',
     borderBottom: '1px solid ' + colors.background, textAlign: 'left', cursor: 'pointer',
-    fontSize: '14px', fontFamily: FONT, color: colors.textSecondary, transition: 'background-color 0.15s ease'
+    fontSize: '14px', fontFamily: FONT, color: colors.textSecondary, transition: 'background-color 0.15s ease',
+    display: 'flex', alignItems: 'center', gap: '8px'
   },
-  customRow: { display: 'flex', gap: '8px', marginBottom: '8px' },
-  customInput: {
-    flex: 1, padding: '12px 16px', fontSize: '15px', fontFamily: FONT,
-    border: '1px solid rgba(0,0,0,0.04)', borderRadius: '14px', backgroundColor: 'white',
-    boxShadow: shadows.sm, outline: 'none', color: colors.textPrimary
+  suggestionPlus: { color: colors.forest, fontWeight: 700, fontSize: '16px', flexShrink: 0 },
+  suggestionText: { display: 'flex', flexDirection: 'column', gap: '2px' },
+  suggestionCategory: { fontSize: '11px', color: colors.textMuted, display: 'block' },
+  createNewSection: {
+    borderTop: '1px solid ' + colors.warmGray
   },
-  addButton: {
-    padding: '12px 20px', backgroundColor: colors.forest, color: 'white',
-    border: 'none', borderRadius: '14px', cursor: 'pointer', fontFamily: FONT,
-    fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', transition: 'all 0.2s ease'
+  createNewItem: {
+    color: colors.forest, fontWeight: 600, borderBottom: 'none'
+  },
+  createNewIcon: { fontSize: '14px' },
+  categorySelectorInline: {
+    width: '100%', padding: '8px 16px', border: 'none',
+    borderTop: '1px solid ' + colors.background, backgroundColor: 'white',
+    fontFamily: FONT, fontSize: '13px', color: colors.textSecondary,
+    cursor: 'pointer', outline: 'none', borderRadius: '0 0 14px 14px',
+    appearance: 'auto'
   },
   generatorButton: {
     width: '100%', padding: '12px 16px', backgroundColor: 'white',
@@ -259,6 +408,17 @@ const styles = {
   empty: { backgroundColor: 'white', borderRadius: '16px', padding: '48px 20px', textAlign: 'center', boxShadow: shadows.sm },
   emptyText: { fontSize: '15px', color: colors.textMuted, margin: 0 },
   section: { marginBottom: '16px' },
+  categoryHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: '8px', padding: '6px 12px',
+    backgroundColor: colors.forest + '0C', borderRadius: '10px'
+  },
+  categoryTitle: { fontSize: '13px', fontWeight: 700, color: colors.forest, letterSpacing: '0.3px' },
+  categoryCount: {
+    fontSize: '12px', fontWeight: 600, color: colors.forest,
+    backgroundColor: colors.forest + '18', borderRadius: '10px',
+    padding: '2px 8px', minWidth: '22px', textAlign: 'center'
+  },
   sectionHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: '10px', paddingBottom: '8px', borderBottom: '1px solid ' + colors.warmGray

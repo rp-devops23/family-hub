@@ -107,6 +107,7 @@ const translations = {
       'settings.tags': 'Gérer les tags',
       'settings.bases': 'Gérer les féculents',
       'settings.ingredients': 'Gérer les ingrédients',
+      'settings.ingredientCategories': 'Gérer les catégories',
       'settings.language': 'Langue',
       'settings.logout': 'Déconnexion',
       'settings.logoutConfirm': 'Voulez-vous vous déconnecter ?',
@@ -114,7 +115,10 @@ const translations = {
       // Tag/Base/Ingredient management
       'manage.tags.title': 'Mes tags',
       'manage.bases.title': 'Mes féculents',
+      'manage.ingredientCategories.title': 'Catégories d\'ingrédients',
       'manage.ingredients.title': 'Mes ingrédients',
+      'manage.category': 'Catégorie',
+      'manage.category.none': 'Sans catégorie',
       'manage.add': 'Ajouter',
       'manage.nameFr': 'Nom (français)',
       'manage.nameEn': 'Nom (anglais)',
@@ -124,6 +128,7 @@ const translations = {
       'manage.delete': 'Supprimer',
       'manage.deleteConfirm': 'Supprimer cet élément ?',
       'manage.inUse': 'Utilisé dans {count} recette(s)',
+      'manage.inUseIngredients': '{count} ingrédient(s)',
 
       // Common
       'common.loading': 'Chargement...',
@@ -144,6 +149,8 @@ const translations = {
       'shopping.generateFromMeals': 'Générer depuis les repas planifiés',
       'shopping.addItem': 'Ajouter un article',
       'shopping.searchPlaceholder': 'Rechercher un ingrédient...',
+      'shopping.unifiedPlaceholder': 'Rechercher ou ajouter un ingrédient...',
+      'shopping.createNew': 'Créer et ajouter',
       'shopping.customItemPlaceholder': 'Ajouter un article manuellement...',
       'shopping.items': 'À acheter',
       'shopping.inCart': 'Dans le panier',
@@ -159,6 +166,8 @@ const translations = {
       'shopping.generateList': 'Générer la liste',
       'shopping.itemsAdded': '{count} article(s) ajouté(s)',
       'shopping.customItem': 'Article personnalisé...',
+      'shopping.uncategorized': 'Autre',
+      'shopping.selectCategory': 'Catégorie (optionnel)',
     },
 
     en: {
@@ -265,6 +274,7 @@ const translations = {
       'settings.tags': 'Manage tags',
       'settings.bases': 'Manage starches',
       'settings.ingredients': 'Manage ingredients',
+      'settings.ingredientCategories': 'Manage categories',
       'settings.language': 'Language',
       'settings.logout': 'Log out',
       'settings.logoutConfirm': 'Do you want to log out?',
@@ -272,7 +282,10 @@ const translations = {
       // Tag/Base/Ingredient management
       'manage.tags.title': 'My tags',
       'manage.bases.title': 'My starches',
+      'manage.ingredientCategories.title': 'Ingredient categories',
       'manage.ingredients.title': 'My ingredients',
+      'manage.category': 'Category',
+      'manage.category.none': 'No category',
       'manage.add': 'Add',
       'manage.nameFr': 'Name (French)',
       'manage.nameEn': 'Name (English)',
@@ -282,6 +295,7 @@ const translations = {
       'manage.delete': 'Delete',
       'manage.deleteConfirm': 'Delete this item?',
       'manage.inUse': 'Used in {count} recipe(s)',
+      'manage.inUseIngredients': '{count} ingredient(s)',
 
       // Common
       'common.loading': 'Loading...',
@@ -302,6 +316,8 @@ const translations = {
       'shopping.generateFromMeals': 'Generate from planned meals',
       'shopping.addItem': 'Add item',
       'shopping.searchPlaceholder': 'Search an ingredient...',
+      'shopping.unifiedPlaceholder': 'Search or add an ingredient...',
+      'shopping.createNew': 'Create & add',
       'shopping.customItemPlaceholder': 'Add a custom item...',
       'shopping.items': 'To buy',
       'shopping.inCart': 'In cart',
@@ -317,6 +333,8 @@ const translations = {
       'shopping.generateList': 'Generate list',
       'shopping.itemsAdded': '{count} item(s) added',
       'shopping.customItem': 'Custom item...',
+      'shopping.uncategorized': 'Other',
+      'shopping.selectCategory': 'Category (optional)',
     },
   }
 

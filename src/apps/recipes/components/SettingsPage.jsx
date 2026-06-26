@@ -8,6 +8,7 @@ export default function SettingsPage() {
 
   const [showTagManager, setShowTagManager] = useState(false)
   const [showBaseManager, setShowBaseManager] = useState(false)
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [showIngredientManager, setShowIngredientManager] = useState(false)
 
   const handleLanguageChange = async (newLang) => {
@@ -88,6 +89,18 @@ export default function SettingsPage() {
           <span style={styles.cardArrow}>→</span>
         </button>
 
+        {/* Ingredient categories management */}
+        <button
+          onClick={() => setShowCategoryManager(true)}
+          style={styles.cardButton}
+        >
+          <div style={styles.cardHeader}>
+            <span style={styles.cardIcon}>📂</span>
+            <span style={styles.cardTitle}>{t('settings.ingredientCategories')}</span>
+          </div>
+          <span style={styles.cardArrow}>→</span>
+        </button>
+
         {/* Ingredients management */}
         <button
           onClick={() => setShowIngredientManager(true)}
@@ -119,6 +132,14 @@ export default function SettingsPage() {
         <TagBaseManager
           type="base"
           onClose={() => setShowBaseManager(false)}
+        />
+      )}
+
+      {/* Ingredient Category Manager Modal */}
+      {showCategoryManager && (
+        <TagBaseManager
+          type="ingredientCategory"
+          onClose={() => setShowCategoryManager(false)}
         />
       )}
 
