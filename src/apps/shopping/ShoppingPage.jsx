@@ -49,7 +49,7 @@ export default function ShoppingPage({ onHome }) {
   async function load() {
     setLoading(true);
     const { data } = await supabase
-      .from('shopping_items')
+      .from('personal_shopping_items')
       .select('*')
       .eq('user_id', user.id)
       .in('category', ['clothing', 'gift'])
@@ -62,7 +62,7 @@ export default function ShoppingPage({ onHome }) {
 
   async function toggleChecked(item) {
     const { data } = await supabase
-      .from('shopping_items')
+      .from('personal_shopping_items')
       .update({ checked: !item.checked, updated_at: new Date().toISOString() })
       .eq('id', item.id).select().single();
     if (data) setItems(prev => prev.map(i => i.id === item.id ? data : i));
@@ -77,10 +77,10 @@ export default function ShoppingPage({ onHome }) {
       : { ...base, occasion: formOccasion || null, for_whom: formForWhom.trim() || null, deadline: formDeadline || null, budget: formBudget !== '' ? parseFloat(formBudget) : null, description: formDescription.trim() || null, item_type: null };
 
     if (editingItem) {
-      const { data } = await supabase.from('shopping_items').update(payload).eq('id', editingItem.id).select().single();
+      const { data } = await supabase.from('personal_shopping_items').update(payload).eq('id', editingItem.id).select().single();
       if (data) setItems(prev => prev.map(i => i.id === editingItem.id ? data : i));
     } else {
-      const { data } = await supabase.from('shopping_items').insert({ ...payload, user_id: user.id }).select().single();
+      const { data } = await supabase.from('personal_shopping_items').insert({ ...payload, user_id: user.id }).select().single();
       if (data) setItems(prev => [data, ...prev]);
     }
     setFormSaving(false);
@@ -88,7 +88,7 @@ export default function ShoppingPage({ onHome }) {
   }
 
   async function del(id) {
-    await supabase.from('shopping_items').delete().eq('id', id);
+    await supabase.from('personal_shopping_items').delete().eq('id', id);
     setItems(prev => prev.filter(i => i.id !== id));
   }
 

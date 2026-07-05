@@ -41,7 +41,7 @@ export default function TravauxPage({ onHome }) {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user.id)
@@ -50,6 +50,7 @@ export default function TravauxPage({ onHome }) {
       .order('priority', { ascending: true, nullsFirst: false })
       .order('expires_at', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
+    if (error) console.error('Load tasks error:', error);
     setTasks(data ?? []);
     setLoading(false);
   }
@@ -75,10 +76,12 @@ export default function TravauxPage({ onHome }) {
       updated_at:       new Date().toISOString(),
     };
     if (editingTask) {
-      const { data } = await supabase.from('tasks').update(payload).eq('id', editingTask.id).select().single();
+      const { data, error } = await supabase.from('tasks').update(payload).eq('id', editingTask.id).select().single();
+      if (error) console.error('Update task error:', error);
       if (data) setTasks(prev => prev.map(t => t.id === editingTask.id ? data : t));
     } else {
-      const { data } = await supabase.from('tasks').insert({ ...payload, user_id: user.id }).select().single();
+      const { data, error } = await supabase.from('tasks').insert({ ...payload, user_id: user.id }).select().single();
+      if (error) console.error('Insert task error:', error);
       if (data) setTasks(prev => [data, ...prev]);
     }
     setFormSaving(false);
