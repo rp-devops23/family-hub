@@ -94,7 +94,7 @@ export async function getCuisines() {
 // ============================================
 
 export async function getIngredientCategories(userId) {
-  const { data, error } = await supabase.from('ingredient_categories').select('*').eq('user_id', userId).order('sort_order', { ascending: true })
+  const { data, error } = await supabase.from('ingredient_categories').select('*').eq('user_id', userId).order('sort_order', { ascending: true }).order('created_at', { ascending: true })
   if (error) throw error
   return data
 }

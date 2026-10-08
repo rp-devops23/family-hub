@@ -134,16 +134,35 @@ export function RecipeProvider({ children }) {
 
   const createIngredientCategory = useCallback(async (categoryData) => {
     if (!user) return
-    const newCategory = await apiCreateIngredientCategory(user.id, categoryData)
+    // Un nouveau rayon arrive en dernière position
+    const sortOrder = ingredientCategories.reduce((max, c) => Math.max(max, c.sort_order ?? 0), 0) + 1
+    const newCategory = await apiCreateIngredientCategory(user.id, { sort_order: sortOrder, ...categoryData })
     setIngredientCategories(prev => [...prev, newCategory].sort((a, b) => a.sort_order - b.sort_order))
     return newCategory
-  }, [user])
+  }, [user, ingredientCategories])
 
   const updateIngredientCategory = useCallback(async (categoryId, categoryData) => {
     const updated = await apiUpdateIngredientCategory(categoryId, categoryData)
     setIngredientCategories(prev => prev.map(c => c.id === categoryId ? updated : c))
     return updated
   }, [])
+
+  // Applique un nouvel ordre (liste d'ids) : mise à jour optimiste, annulée si l'enregistrement échoue
+  const reorderIngredientCategories = useCallback(async (orderedIds) => {
+    const previous = ingredientCategories
+    const byId = new Map(previous.map(c => [c.id, c]))
+    const next = orderedIds.map((id, i) => ({ ...byId.get(id), sort_order: i + 1 }))
+    setIngredientCategories(next)
+    try {
+      await Promise.all(
+        next.filter(c => byId.get(c.id).sort_order !== c.sort_order)
+          .map(c => apiUpdateIngredientCategory(c.id, { sort_order: c.sort_order }))
+      )
+    } catch (error) {
+      setIngredientCategories(previous)
+      throw error
+    }
+  }, [ingredientCategories])
 
   const deleteIngredientCategory = useCallback(async (categoryId) => {
     await apiDeleteIngredientCategory(categoryId)
@@ -287,7 +306,7 @@ export function RecipeProvider({ children }) {
     createBase, updateBase, deleteBase,
 
     // Ingredient category actions
-    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory, reorderIngredientCategories,
 
     // Ingredient actions
     createIngredient, updateIngredient, deleteIngredient,
@@ -307,7 +326,7 @@ export function RecipeProvider({ children }) {
     currentTab,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
-    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory, reorderIngredientCategories,
     createIngredient, updateIngredient, deleteIngredient,
     createRecipe, updateRecipe, deleteRecipe,
     loadMealPlans, createMealPlan, deleteMealPlan,

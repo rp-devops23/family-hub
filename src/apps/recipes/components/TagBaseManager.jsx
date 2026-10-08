@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, shadows, commonStyles } from '../lib/theme'
 
-// Common emoji picker options
-const EMOJI_OPTIONS = ['🏷️', '⚡', '👶', '🥬', '🌱', '🍖', '🐟', '🌶️', '❤️', '⭐', '🔥', '🧀', '🥗', '🍝', '🍜', '🥘', '🍰', '🎉']
-const CATEGORY_EMOJI_OPTIONS = ['🥬', '🍖', '🧀', '🍚', '🥫', '🍺', '❄️', '🧴', '🍞', '🥚', '🫒', '🧂', '🍫', '🐟', '🥜', '🧁', '🌿', '🛒']
+import EmojiPicker from './EmojiPicker'
 
 export default function TagBaseManager({ type, onClose }) {
   const {
@@ -12,7 +10,7 @@ export default function TagBaseManager({ type, onClose }) {
     tags, bases, ingredients, ingredientCategories, recipes,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
-    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory, reorderIngredientCategories,
     createIngredient, updateIngredient, deleteIngredient
   } = useApp()
 
@@ -96,7 +94,8 @@ export default function TagBaseManager({ type, onClose }) {
       const data = {
         name_fr: nameFr.trim(),
         name_en: nameEn.trim(),
-        ...((isTag || isCategory) && { icon }),
+        // icon est NOT NULL côté tags : on retombe sur l'emoji par défaut si le champ est vidé
+        ...((isTag || isCategory) && { icon: icon || '🏷️' }),
         ...(isIngredient && { category_id: categoryId || null })
       }
 
@@ -153,6 +152,19 @@ export default function TagBaseManager({ type, onClose }) {
     }
   }
 
+  // Déplace un rayon d'un cran (l'ordre de cette liste est celui de la liste de courses)
+  const handleMove = async (index, delta) => {
+    const ids = ingredientCategories.map(c => c.id)
+    const target = index + delta
+    if (target < 0 || target >= ids.length) return
+    ;[ids[index], ids[target]] = [ids[target], ids[index]]
+    try {
+      await reorderIngredientCategories(ids)
+    } catch (error) {
+      console.error('Reorder error:', error)
+    }
+  }
+
   // Get category name for an ingredient
   const getCategoryLabel = (item) => {
     if (!isIngredient || !item.category_id) return null
@@ -174,8 +186,9 @@ export default function TagBaseManager({ type, onClose }) {
           {/* Item list */}
           {!showForm && (
             <>
+              {isCategory && <p style={styles.orderHint}>{t('manage.orderHint')}</p>}
               <div style={styles.list}>
-                {items.map(item => {
+                {items.map((item, index) => {
                   const usageCount = getUsageCount(item.id)
                   const catLabel = getCategoryLabel(item)
                   return (
@@ -197,6 +210,20 @@ export default function TagBaseManager({ type, onClose }) {
                         </div>
                       </div>
                       <div style={styles.itemActions}>
+                        {isCategory && (
+                          <>
+                            <button
+                              onClick={() => handleMove(index, -1)} disabled={index === 0}
+                              style={{ ...styles.editButton, opacity: index === 0 ? 0.25 : 1 }}
+                              aria-label={t('manage.moveUp')} title={t('manage.moveUp')}
+                            >▲</button>
+                            <button
+                              onClick={() => handleMove(index, 1)} disabled={index === items.length - 1}
+                              style={{ ...styles.editButton, opacity: index === items.length - 1 ? 0.25 : 1 }}
+                              aria-label={t('manage.moveDown')} title={t('manage.moveDown')}
+                            >▼</button>
+                          </>
+                        )}
                         <button
                           onClick={() => handleEdit(item)}
                           style={styles.editButton}
@@ -228,22 +255,7 @@ export default function TagBaseManager({ type, onClose }) {
               {(isTag || isCategory) && (
                 <div style={styles.field}>
                   <label style={commonStyles.label}>{t('manage.icon')}</label>
-                  <div style={styles.emojiPicker}>
-                    {(isCategory ? CATEGORY_EMOJI_OPTIONS : EMOJI_OPTIONS).map(emoji => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => setIcon(emoji)}
-                        style={{
-                          ...styles.emojiButton,
-                          backgroundColor: icon === emoji ? colors.forest + '18' : 'transparent',
-                          borderColor: icon === emoji ? colors.forest : 'transparent'
-                        }}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
+                  <EmojiPicker value={icon} onChange={setIcon} placeholder={t('manage.emojiPlaceholder')} />
                 </div>
               )}
 
@@ -398,15 +410,7 @@ const styles = {
     appearance: 'auto', cursor: 'pointer'
   },
 
-  emojiPicker: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs },
-
-  emojiButton: {
-    width: '42px', height: '42px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    border: '2px solid transparent', borderRadius: '10px',
-    cursor: 'pointer', fontSize: fontSizes.lg, backgroundColor: 'transparent',
-    transition: 'all 0.2s ease'
-  },
+  orderHint: { margin: `0 0 ${spacing.sm}`, fontSize: fontSizes.xs, color: colors.textMuted, lineHeight: 1.4 },
 
   formActions: { display: 'flex', gap: spacing.sm, marginTop: spacing.sm },
   cancelButton: { ...commonStyles.buttonBase, ...commonStyles.buttonSecondary, flex: 1 },
