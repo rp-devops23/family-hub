@@ -117,6 +117,39 @@ export async function deleteIngredient(ingredientId) {
 }
 
 // ============================================
+// SHOPPING CATEGORIES (rayons)
+// ============================================
+
+export async function getShoppingCategories(userId) {
+  const { data, error } = await supabase.from('shopping_categories').select('*').eq('user_id', userId).order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function createShoppingCategory(userId, category) {
+  const { data, error } = await supabase.from('shopping_categories').insert({ user_id: userId, ...category }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function createShoppingCategories(userId, categories) {
+  const { data, error } = await supabase.from('shopping_categories').insert(categories.map(c => ({ user_id: userId, ...c }))).select()
+  if (error) throw error
+  return data
+}
+
+export async function updateShoppingCategory(categoryId, updates) {
+  const { data, error } = await supabase.from('shopping_categories').update(updates).eq('id', categoryId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteShoppingCategory(categoryId) {
+  const { error } = await supabase.from('shopping_categories').delete().eq('id', categoryId)
+  if (error) throw error
+}
+
+// ============================================
 // RECIPES
 // ============================================
 

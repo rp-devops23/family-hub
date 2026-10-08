@@ -2,13 +2,15 @@ import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
 
-// Common emoji picker options
-const EMOJI_OPTIONS = ['🏷️', '⚡', '👶', '🥬', '🌱', '🍖', '🐟', '🌶️', '❤️', '⭐', '🔥', '🧀', '🥗', '🍝', '🍜', '🥘', '🍰', '🎉']
+import EmojiPicker from './EmojiPicker'
+
+// Emoji proposé par défaut à la création (les ingrédients n'en ont pas par défaut)
+const DEFAULT_ICONS = { tag: '🏷️', base: '🍚', ingredient: '' }
 
 export default function TagBaseManager({ type, onClose }) {
   const { 
     t, getName, language,
-    tags, bases, ingredients, recipes,
+    tags, bases, ingredients, recipes, shoppingCategories,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
     createIngredient, updateIngredient, deleteIngredient
@@ -32,7 +34,10 @@ export default function TagBaseManager({ type, onClose }) {
   // Form state
   const [nameFr, setNameFr] = useState('')
   const [nameEn, setNameEn] = useState('')
-  const [icon, setIcon] = useState('🏷️')
+  const [icon, setIcon] = useState(DEFAULT_ICONS[type])
+  const [categoryId, setCategoryId] = useState('')
+
+  const categoryById = new Map(shoppingCategories.map(c => [c.id, c]))
 
   // Count recipes using an item
   const getUsageCount = (itemId) => {
@@ -54,7 +59,8 @@ export default function TagBaseManager({ type, onClose }) {
     setEditingItem(null)
     setNameFr('')
     setNameEn('')
-    setIcon('🏷️')
+    setIcon(DEFAULT_ICONS[type])
+    setCategoryId('')
     setShowForm(true)
   }
 
@@ -63,9 +69,8 @@ export default function TagBaseManager({ type, onClose }) {
     setEditingItem(item)
     setNameFr(item.name_fr)
     setNameEn(item.name_en)
-    if (isTag) {
-      setIcon(item.icon)
-    }
+    setIcon(item.icon ?? DEFAULT_ICONS[type])
+    setCategoryId(item.category_id || '')
     setShowForm(true)
   }
 
@@ -84,7 +89,9 @@ export default function TagBaseManager({ type, onClose }) {
       const data = {
         name_fr: nameFr.trim(),
         name_en: nameEn.trim(),
-        ...(isTag && { icon })
+        // La colonne icon des tags est NOT NULL : on retombe sur l'emoji par défaut
+        icon: icon || (isTag ? DEFAULT_ICONS.tag : null),
+        ...(isIngredient && { category_id: categoryId || null })
       }
 
       if (editingItem) {
@@ -154,7 +161,12 @@ export default function TagBaseManager({ type, onClose }) {
                   return (
                     <div key={item.id} style={styles.item}>
                       <div style={styles.itemInfo}>
-                        {isTag && <span style={styles.itemIcon}>{item.icon}</span>}
+                        <span style={styles.itemIcon}>{item.icon || (isIngredient ? '🥕' : DEFAULT_ICONS[type])}</span>
+                        {isIngredient && categoryById.get(item.category_id) && (
+                          <span style={styles.categoryChip} title={getName(categoryById.get(item.category_id))}>
+                            {categoryById.get(item.category_id).icon}
+                          </span>
+                        )}
                         <div style={styles.itemNames}>
                           <span style={styles.itemName}>{getName(item)}</span>
                           {usageCount > 0 && (
@@ -192,28 +204,11 @@ export default function TagBaseManager({ type, onClose }) {
           {/* Form */}
           {showForm && (
             <div style={styles.form}>
-              {/* Icon picker (tags only) */}
-              {isTag && (
-                <div style={styles.field}>
-                  <label style={commonStyles.label}>{t('manage.icon')}</label>
-                  <div style={styles.emojiPicker}>
-                    {EMOJI_OPTIONS.map(emoji => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => setIcon(emoji)}
-                        style={{
-                          ...styles.emojiButton,
-                          backgroundColor: icon === emoji ? colors.forest + '20' : 'transparent',
-                          borderColor: icon === emoji ? colors.forest : 'transparent'
-                        }}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Icon picker */}
+              <div style={styles.field}>
+                <label style={commonStyles.label}>{t('manage.icon')}</label>
+                <EmojiPicker value={icon} onChange={setIcon} placeholder={t('manage.emojiPlaceholder')} />
+              </div>
 
               {/* Name FR */}
               <div style={styles.field}>
@@ -239,6 +234,19 @@ export default function TagBaseManager({ type, onClose }) {
                   placeholder="Ex: Vegetarian"
                 />
               </div>
+
+              {/* Aisle (ingredients only) */}
+              {isIngredient && (
+                <div style={styles.field}>
+                  <label style={commonStyles.label}>{t('manage.category')}</label>
+                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={styles.input}>
+                    <option value="">{t('manage.category.none')}</option>
+                    {shoppingCategories.map(c => (
+                      <option key={c.id} value={c.id}>{c.icon} {getName(c)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Form actions */}
               <div style={styles.formActions}>
@@ -291,7 +299,7 @@ const styles = {
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
     width: '100%',
-    maxWidth: '400px',
+    maxWidth: '440px',
     maxHeight: '80vh',
     display: 'flex',
     flexDirection: 'column',
@@ -357,7 +365,14 @@ const styles = {
   },
 
   itemIcon: {
-    fontSize: fontSizes.lg
+    fontSize: '22px'
+  },
+
+  categoryChip: {
+    fontSize: fontSizes.sm,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.full,
+    padding: '2px 6px'
   },
 
   itemNames: {
@@ -427,25 +442,6 @@ const styles = {
   input: {
     ...commonStyles.input,
     padding: spacing.sm
-  },
-
-  emojiPicker: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: spacing.xs
-  },
-
-  emojiButton: {
-    width: '40px',
-    height: '40px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: '2px solid transparent',
-    borderRadius: borderRadius.md,
-    cursor: 'pointer',
-    fontSize: fontSizes.lg,
-    backgroundColor: 'transparent'
   },
 
   formActions: {

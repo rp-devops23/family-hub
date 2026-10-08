@@ -32,7 +32,7 @@ export default function Layout({ onHome }) {
       <header style={styles.header}>
         <div style={styles.logo}>
           {onHome && (
-            <button onClick={onHome} style={styles.homeBtn} title={language === 'fr' ? 'Accueil' : 'Home'}>
+            <button onClick={onHome} style={styles.homeBtn} aria-label="Home" title={language === 'fr' ? 'Accueil' : 'Home'}>
               🏠
             </button>
           )}
@@ -64,6 +64,7 @@ export default function Layout({ onHome }) {
             <button
               key={tab.id}
               onClick={() => setCurrentTab(tab.id)}
+              aria-current={isActive ? 'page' : undefined}
               style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
             >
               <span style={{ ...styles.icon, opacity: isActive ? 1 : 0.5, transform: isActive ? 'scale(1.1)' : 'scale(1)' }}>
@@ -90,7 +91,7 @@ const styles = {
     padding: '12px 16px', backgroundColor: 'white',
     borderBottom: '1px solid #E1E8ED',
     position: 'sticky', top: 0, zIndex: 200,
-    boxSizing: 'border-box'
+    boxSizing: 'border-box', boxShadow: '0 1px 8px rgba(0,0,0,0.04)'
   },
   logo: { display: 'flex', alignItems: 'center', gap: '8px' },
   homeBtn: {
@@ -121,17 +122,18 @@ const styles = {
     left: '50%', transform: 'translateX(-50%)',
     width: '100%', maxWidth: '600px',
     backgroundColor: 'white', borderTop: '1px solid #E1E8ED',
-    display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-    padding: '8px 0 max(8px, env(safe-area-inset-bottom))', zIndex: 100
+    display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '4px',
+    padding: '6px 8px max(8px, env(safe-area-inset-bottom))', zIndex: 100,
+    boxSizing: 'border-box', boxShadow: '0 -4px 16px rgba(0,0,0,0.05)'
   },
   tab: {
-    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', gap: '4px', padding: '8px 12px',
+    flex: 1, minHeight: '52px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', gap: '2px', padding: '6px 12px',
     border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
-    borderRadius: '8px', transition: 'background-color 0.2s'
+    borderRadius: '14px', transition: 'background-color 0.2s'
   },
-  tabActive: { backgroundColor: '#F0F9FF' },
-  icon: { fontSize: '20px', position: 'relative', transition: 'all 0.2s' },
+  tabActive: { backgroundColor: '#E6F6FD' },
+  icon: { fontSize: '22px', position: 'relative', transition: 'all 0.2s' },
   badge: {
     position: 'absolute', top: '-6px', right: '-10px',
     backgroundColor: '#E74C3C', color: 'white',

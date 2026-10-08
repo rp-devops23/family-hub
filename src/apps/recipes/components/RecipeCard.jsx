@@ -33,7 +33,7 @@ export default function RecipeCard({ recipe, onClick }) {
       <div style={styles.meta}>
         {recipe.cuisine && <span style={styles.metaItem}>{recipe.cuisine.flag} {getName(recipe.cuisine)}</span>}
         {recipe.prep_time_minutes && <span style={styles.metaItem}>⏱️ {recipe.prep_time_minutes} {t('common.minutes')}</span>}
-        {recipe.base && <span style={styles.metaItem}>🍚 {getName(recipe.base)}</span>}
+        {recipe.base && <span style={styles.metaItem}>{recipe.base.icon || '🍚'} {getName(recipe.base)}</span>}
         {ingredientsCount > 0 && <span style={styles.metaItem}>🥕 {ingredientsCount}</span>}
         {recipe.meal_type && recipe.meal_type !== 'main' && <span style={styles.metaItem}>{t(`mealType.${recipe.meal_type}`)}</span>}
       </div>
@@ -65,8 +65,9 @@ export default function RecipeCard({ recipe, onClick }) {
 
 const styles = {
   card: {
-    backgroundColor: 'white', borderRadius: '12px', padding: '14px 16px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer'
+    backgroundColor: 'white', borderRadius: '14px', padding: '14px 16px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer',
+    border: '1px solid #EEF1F4'
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: '8px' },
   titleRow: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 },

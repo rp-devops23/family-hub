@@ -137,6 +137,7 @@ create table bases (
   user_id uuid references auth.users(id) on delete cascade not null,
   name_fr text not null,
   name_en text not null,
+  icon text,
   sort_order integer default 0,
   created_at timestamptz default now()
 );
@@ -150,11 +151,23 @@ create table cuisines (
   created_at timestamptz default now()
 );
 
+create table shopping_categories (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  name_fr text not null,
+  name_en text not null,
+  icon text default '🛒',
+  sort_order integer default 0,
+  created_at timestamptz default now()
+);
+
 create table ingredients (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references auth.users(id) on delete cascade not null,
   name_fr text not null,
   name_en text not null,
+  category_id uuid references shopping_categories(id) on delete set null,
+  icon text,
   created_at timestamptz default now()
 );
 
@@ -206,6 +219,7 @@ create table shopping_items (
   checked boolean default false,
   sort_order integer default 0,
   custom_name text,
+  category_id uuid references shopping_categories(id) on delete set null,
   count numeric(10,2),
   created_at timestamptz default now()
 );
@@ -231,6 +245,7 @@ alter table recipe_tags enable row level security;
 alter table recipe_ingredients enable row level security;
 alter table meal_plans enable row level security;
 alter table shopping_items enable row level security;
+alter table shopping_categories enable row level security;
 
 create policy "Users manage own accounts" on accounts for all using (auth.uid() = user_id);
 create policy "Users manage own categories" on categories for all using (auth.uid() = user_id);
@@ -257,6 +272,7 @@ create policy "Users manage own recipe_ingredients" on recipe_ingredients for al
 );
 create policy "Users manage own meal_plans" on meal_plans for all using (auth.uid() = user_id);
 create policy "Users manage own shopping_items" on shopping_items for all using (auth.uid() = user_id);
+create policy "Users manage own shopping_categories" on shopping_categories for all using (auth.uid() = user_id);
 
 -- Cuisines: public read, no write from client
 create policy "Cuisines are public" on cuisines for select using (true);
