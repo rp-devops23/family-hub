@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './apps/finance/context/AppContext';
 import LoginPage from './apps/finance/pages/LoginPage';
@@ -10,12 +10,41 @@ import TravauxApp from './apps/travaux/TravauxApp';
 import ShoppingApp from './apps/shopping/ShoppingApp';
 import HolidayApp from './apps/holiday/HolidayApp';
 import PortalPage from './portal/PortalPage';
+import { isAppId, pushRecentApp } from './portal/apps';
 import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
 
+// L'application ouverte est reflétée dans l'URL (#/recettes…) : le bouton retour du
+// téléphone ramène à l'accueil au lieu de quitter, et un rechargement garde l'app.
+function appFromHash() {
+  const id = window.location.hash.replace(/^#\/?/, '');
+  return isAppId(id) ? id : null;
+}
+
 function AppInner() {
   const { user, authLoading } = useAuth();
-  const [activeApp, setActiveApp] = useState(null);
+  const [activeApp, setActiveApp] = useState(appFromHash);
+
+  useEffect(() => {
+    const onPop = () => setActiveApp(appFromHash());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const openApp = (id) => {
+    pushRecentApp(id);
+    window.history.pushState({ app: id }, '', `#/${id}`);
+    setActiveApp(id);
+  };
+
+  const goHome = () => {
+    if (window.history.state?.app) {
+      window.history.back(); // dépile l'entrée ajoutée par openApp
+    } else {
+      window.history.replaceState(null, '', window.location.pathname);
+      setActiveApp(null);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -34,43 +63,43 @@ function AppInner() {
   if (window.location.pathname === '/auth/google/callback') {
     return <GoogleCallbackPage onDone={() => {
       window.history.replaceState({}, '', '/');
-      setActiveApp('agent');
+      openApp('agent');
     }} />;
   }
 
   if (activeApp === 'finance') {
     return (
       <AppProvider>
-        <FinanceApp onHome={() => setActiveApp(null)} />
+        <FinanceApp onHome={goHome} />
       </AppProvider>
     );
   }
 
   if (activeApp === 'recipes') {
-    return <RecipeApp onHome={() => setActiveApp(null)} />;
+    return <RecipeApp onHome={goHome} />;
   }
 
   if (activeApp === 'agent') {
-    return <AgentApp onHome={() => setActiveApp(null)} />;
+    return <AgentApp onHome={goHome} />;
   }
 
   if (activeApp === 'corvees') {
-    return <CorveesApp onHome={() => setActiveApp(null)} />;
+    return <CorveesApp onHome={goHome} />;
   }
 
   if (activeApp === 'travaux') {
-    return <TravauxApp onHome={() => setActiveApp(null)} />;
+    return <TravauxApp onHome={goHome} />;
   }
 
   if (activeApp === 'shopping') {
-    return <ShoppingApp onHome={() => setActiveApp(null)} />;
+    return <ShoppingApp onHome={goHome} />;
   }
 
   if (activeApp === 'holiday') {
-    return <HolidayApp onHome={() => setActiveApp(null)} />;
+    return <HolidayApp onHome={goHome} />;
   }
 
-  return <PortalPage onSelectApp={setActiveApp} />;
+  return <PortalPage onSelectApp={openApp} />;
 }
 
 export default function App() {
