@@ -10,7 +10,7 @@ import TravauxApp from './apps/travaux/TravauxApp';
 import ShoppingApp from './apps/shopping/ShoppingApp';
 import HolidayApp from './apps/holiday/HolidayApp';
 import PortalPage from './portal/PortalPage';
-import { isAppId, pushRecentApp } from './portal/apps';
+import { isAppId, pushRecentApp, getHomePrefs, getLastVisibleApp } from './portal/apps';
 import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
 
@@ -23,7 +23,11 @@ function appFromHash() {
 
 function AppInner() {
   const { user, authLoading } = useAuth();
-  const [activeApp, setActiveApp] = useState(appFromHash);
+  // Au démarrage : l'app de l'URL, sinon (si activé dans « Personnaliser ») la dernière app ouverte.
+  // Le bouton 🏠 ramène toujours à l'accueil.
+  const [activeApp, setActiveApp] = useState(
+    () => appFromHash() ?? (getHomePrefs().openLast ? getLastVisibleApp() : null)
+  );
 
   useEffect(() => {
     const onPop = () => setActiveApp(appFromHash());
