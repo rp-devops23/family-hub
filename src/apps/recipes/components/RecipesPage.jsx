@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts } from '../lib/theme'
+import { colors, fonts, shadows } from '../lib/theme'
 import RecipeCard from './RecipeCard'
 import RecipeForm from './RecipeForm'
 import FilterPanel from './FilterPanel'
@@ -83,7 +83,7 @@ export default function RecipesPage() {
       </div>
 
       <button onClick={handleAddRecipe} style={styles.fab}>
-        <span style={{ fontSize: '24px', lineHeight: 1 }}>+</span>
+        <span style={{ fontSize: '26px', lineHeight: 1, fontWeight: 300 }}>+</span>
       </button>
 
       {showForm && <RecipeForm recipe={editingRecipe} onClose={handleCloseForm} />}
@@ -92,32 +92,35 @@ export default function RecipesPage() {
 }
 
 const styles = {
-  container: { padding: '20px 16px 100px' },
+  container: { padding: '16px 16px 100px' },
   searchBar: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    backgroundColor: 'white', borderRadius: '10px', padding: '10px 14px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: '12px'
+    backgroundColor: 'white', borderRadius: '14px', padding: '12px 16px',
+    boxShadow: shadows.sm, marginBottom: '12px',
+    border: '1px solid rgba(0,0,0,0.04)',
   },
-  searchIcon: { fontSize: '16px' },
+  searchIcon: { fontSize: '16px', opacity: 0.6 },
   searchInput: {
     flex: 1, border: 'none', outline: 'none', fontSize: '15px',
     backgroundColor: 'transparent', fontFamily: fonts.body, color: colors.textPrimary
   },
   clearBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    border: 'none', backgroundColor: '#F5F7FA', borderRadius: '50%',
-    width: '24px', height: '24px', cursor: 'pointer', color: '#636E72', fontSize: '12px'
+    border: 'none', backgroundColor: colors.background, borderRadius: '50%',
+    width: '26px', height: '26px', cursor: 'pointer', color: colors.textMuted, fontSize: '12px',
+    transition: 'all 0.2s ease'
   },
-  resultsCount: { fontSize: '14px', color: '#636E72', marginBottom: '12px', textAlign: 'center' },
-  list: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  empty: { backgroundColor: 'white', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
-  emptyText: { fontSize: '16px', color: '#636E72', margin: 0 },
+  resultsCount: { fontSize: '13px', color: colors.textMuted, marginBottom: '12px', textAlign: 'center', fontWeight: 500 },
+  list: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  empty: { backgroundColor: 'white', borderRadius: '16px', padding: '48px 20px', textAlign: 'center', boxShadow: shadows.sm },
+  emptyText: { fontSize: '15px', color: colors.textMuted, margin: 0 },
   fab: {
-    position: 'fixed', bottom: '90px', right: 'max(20px, calc(50% - 280px))',
-    width: '56px', height: '56px', borderRadius: '28px',
+    position: 'fixed', bottom: '100px', right: 'max(20px, calc(50% - 280px))',
+    width: '56px', height: '56px', borderRadius: '18px',
     backgroundColor: colors.forest, color: 'white', border: 'none',
-    boxShadow: '0 4px 12px rgba(45,90,61,0.4)', cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(27,107,58,0.35)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '28px', fontWeight: '300', fontFamily: fonts.body
+    fontSize: '28px', fontWeight: '300', fontFamily: fonts.body,
+    transition: 'all 0.25s ease'
   }
 }

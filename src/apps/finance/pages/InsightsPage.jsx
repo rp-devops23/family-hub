@@ -23,7 +23,7 @@ export default function InsightsPage() {
   // ============================================================================
   // STATE
   // ============================================================================
-  const [viewMode, setViewMode] = useState('yearly'); // 'yearly' or 'monthly'
+  const [viewMode, setViewMode] = useState('yearly'); // 'yearly' | 'monthly' | 'alltime'
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [showSettings, setShowSettings] = useState(false);
@@ -31,9 +31,17 @@ export default function InsightsPage() {
   
   // Settings
   const [yearsToCompare, setYearsToCompare] = useState(2);
-  const [selectedAccount, setSelectedAccount] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [chartType, setChartType] = useState('bar');
+  const [metricType, setMetricType] = useState('expenses'); // 'expenses' | 'income' | 'balance'
+
+  // Account selector — default to "Commun"
+  const communAccount = useMemo(
+    () => accounts.find(a => a.name.toLowerCase() === 'commun') || accounts[0],
+    [accounts]
+  );
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const effectiveAccount = selectedAccount ?? communAccount?.id ?? 'all';
 
   // Month names
   const monthNames = language === 'fr'
@@ -43,6 +51,15 @@ export default function InsightsPage() {
   const monthNamesShort = language === 'fr'
     ? ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
     : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  // Helper: compute metric value from a list of transactions
+  const computeMetric = (txList, metric) => {
+    const income = txList.filter(tx => tx.type === 'income').reduce((s, tx) => s + tx.amount, 0);
+    const expenses = txList.filter(tx => !tx.type || tx.type === 'expense').reduce((s, tx) => s + tx.amount, 0);
+    if (metric === 'income') return income;
+    if (metric === 'balance') return income - expenses;
+    return expenses;
+  };
 
   // ============================================================================
   // AVAILABLE YEARS
@@ -60,19 +77,20 @@ export default function InsightsPage() {
   // ============================================================================
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      if (selectedAccount !== 'all' && tx.account_id !== selectedAccount) return false;
+      if (effectiveAccount !== 'all' && tx.account_id !== effectiveAccount) return false;
       if (selectedCategory !== 'all') {
         const sub = subcategories.find(s => s.id === tx.subcategory_id);
         if (!sub || sub.category_id !== selectedCategory) return false;
       }
       return true;
     });
-  }, [transactions, selectedAccount, selectedCategory, subcategories]);
+  }, [transactions, effectiveAccount, selectedCategory, subcategories]);
 
   // ============================================================================
   // CURRENT PERIOD TRANSACTIONS
   // ============================================================================
   const periodTransactions = useMemo(() => {
+    if (viewMode === 'alltime') return filteredTransactions;
     return filteredTransactions.filter(tx => {
       const d = new Date(tx.date);
       if (viewMode === 'monthly') {
@@ -86,27 +104,31 @@ export default function InsightsPage() {
   // KPI DATA
   // ============================================================================
   const kpiData = useMemo(() => {
-    const currentTotal = periodTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    
+    const currentTotal = computeMetric(periodTransactions, metricType);
+
+    if (viewMode === 'alltime') {
+      const yearsWithData = availableYears.length;
+      const avg = yearsWithData > 0 ? currentTotal / yearsWithData : 0;
+      return { total: currentTotal, diff: null, avg, txCount: periodTransactions.length, prevLabel: '' };
+    }
+
     // Get previous period for comparison
     let prevTransactions;
     if (viewMode === 'monthly') {
-      // Same month, previous year
       prevTransactions = filteredTransactions.filter(tx => {
         const d = new Date(tx.date);
         return d.getFullYear() === selectedYear - 1 && d.getMonth() === selectedMonth;
       });
     } else {
-      // Previous year
       prevTransactions = filteredTransactions.filter(tx => {
         const d = new Date(tx.date);
         return d.getFullYear() === selectedYear - 1;
       });
     }
-    
-    const prevTotal = prevTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    const diff = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : 0;
-    
+
+    const prevTotal = computeMetric(prevTransactions, metricType);
+    const diff = prevTotal !== 0 ? ((currentTotal - prevTotal) / Math.abs(prevTotal)) * 100 : 0;
+
     // Average
     let avg = 0;
     if (viewMode === 'monthly') {
@@ -122,11 +144,11 @@ export default function InsightsPage() {
       diff,
       avg,
       txCount: periodTransactions.length,
-      prevLabel: viewMode === 'monthly' 
+      prevLabel: viewMode === 'monthly'
         ? `${monthNamesShort[selectedMonth]} ${selectedYear - 1}`
         : String(selectedYear - 1),
     };
-  }, [periodTransactions, filteredTransactions, viewMode, selectedYear, selectedMonth, monthNamesShort]);
+  }, [periodTransactions, filteredTransactions, viewMode, selectedYear, selectedMonth, monthNamesShort, metricType, availableYears]);
 
   // ============================================================================
   // CATEGORY BREAKDOWN (for current period)
@@ -196,19 +218,17 @@ export default function InsightsPage() {
     const data = monthNamesShort.map((name, monthIndex) => {
       const point = { name };
       years.forEach(year => {
-        const monthTotal = filteredTransactions
-          .filter(tx => {
-            const d = new Date(tx.date);
-            return d.getFullYear() === year && d.getMonth() === monthIndex;
-          })
-          .reduce((sum, tx) => sum + tx.amount, 0);
-        point[year] = Math.round(monthTotal);
+        const monthTx = filteredTransactions.filter(tx => {
+          const d = new Date(tx.date);
+          return d.getFullYear() === year && d.getMonth() === monthIndex;
+        });
+        point[year] = Math.round(computeMetric(monthTx, metricType));
       });
       return point;
     });
 
     return { data, years };
-  }, [viewMode, filteredTransactions, selectedYear, yearsToCompare, monthNamesShort]);
+  }, [viewMode, filteredTransactions, selectedYear, yearsToCompare, monthNamesShort, metricType]);
 
   // ============================================================================
   // MONTHLY VIEW: Same month comparison across years
@@ -270,21 +290,30 @@ export default function InsightsPage() {
       const year = selectedYear - i;
       if (!availableYears.includes(year)) continue;
       
-      const total = filteredTransactions
-        .filter(tx => {
-          const d = new Date(tx.date);
-          return d.getFullYear() === year && d.getMonth() === selectedMonth;
-        })
-        .reduce((sum, tx) => sum + tx.amount, 0);
-      
+      const monthTx = filteredTransactions.filter(tx => {
+        const d = new Date(tx.date);
+        return d.getFullYear() === year && d.getMonth() === selectedMonth;
+      });
+
       data.push({
         name: String(year),
-        total: Math.round(total),
+        total: Math.round(computeMetric(monthTx, metricType)),
         fill: YEAR_COLORS[yearsToCompare - 1 - i] || COLORS[i % COLORS.length],
       });
     }
     return data;
-  }, [viewMode, filteredTransactions, selectedYear, selectedMonth, yearsToCompare, availableYears]);
+  }, [viewMode, filteredTransactions, selectedYear, selectedMonth, yearsToCompare, availableYears, metricType]);
+
+  // ============================================================================
+  // ALL-TIME VIEW: one bar per available year
+  // ============================================================================
+  const allTimeChartData = useMemo(() => {
+    if (viewMode !== 'alltime') return [];
+    return [...availableYears].sort((a, b) => a - b).map(year => {
+      const yearTx = filteredTransactions.filter(tx => new Date(tx.date).getFullYear() === year);
+      return { name: String(year), value: Math.round(computeMetric(yearTx, metricType)) };
+    });
+  }, [viewMode, filteredTransactions, availableYears, metricType]);
 
   // ============================================================================
   // NAVIGATION HELPERS
@@ -328,25 +357,45 @@ export default function InsightsPage() {
         </button>
       </div>
 
+      {/* Account selector */}
+      {accounts.length > 1 && (
+        <div style={styles.accountRow}>
+          {accounts.map(account => (
+            <button
+              key={account.id}
+              onClick={() => setSelectedAccount(account.id)}
+              style={{
+                ...styles.accountBtn,
+                backgroundColor: effectiveAccount === account.id ? account.color : 'white',
+                color: effectiveAccount === account.id ? 'white' : account.color,
+                borderColor: account.color,
+              }}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* View Mode Toggle */}
       <div style={styles.viewModeToggle}>
         <button
           onClick={() => setViewMode('yearly')}
-          style={{
-            ...styles.viewModeBtn,
-            ...(viewMode === 'yearly' ? styles.viewModeBtnActive : {}),
-          }}
+          style={{ ...styles.viewModeBtn, ...(viewMode === 'yearly' ? styles.viewModeBtnActive : {}) }}
         >
           📅 {t('Annuel', 'Yearly')}
         </button>
         <button
           onClick={() => setViewMode('monthly')}
-          style={{
-            ...styles.viewModeBtn,
-            ...(viewMode === 'monthly' ? styles.viewModeBtnActive : {}),
-          }}
+          style={{ ...styles.viewModeBtn, ...(viewMode === 'monthly' ? styles.viewModeBtnActive : {}) }}
         >
           📆 {t('Mensuel', 'Monthly')}
+        </button>
+        <button
+          onClick={() => setViewMode('alltime')}
+          style={{ ...styles.viewModeBtn, ...(viewMode === 'alltime' ? styles.viewModeBtnActive : {}) }}
+        >
+          📋 {t('Tout', 'All time')}
         </button>
       </div>
 
@@ -396,24 +445,11 @@ export default function InsightsPage() {
             </div>
           </div>
 
-          <div style={styles.settingRow}>
-            <span style={styles.settingLabel}>{t('Compte', 'Account')}</span>
-            <select
-              value={selectedAccount}
-              onChange={e => setSelectedAccount(e.target.value)}
-              style={styles.select}
-            >
-              <option value="all">{t('Tous', 'All')}</option>
-              {accounts.map(acc => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
-              ))}
-            </select>
-          </div>
         </div>
       )}
 
-      {/* Period Selector */}
-      <div style={styles.periodSelector}>
+      {/* Period Selector — hidden in alltime mode */}
+      {viewMode !== 'alltime' && <div style={styles.periodSelector}>
         {viewMode === 'monthly' && (
           <div style={styles.monthSelector}>
             <button onClick={goToPrevMonth} style={styles.navBtn}>◀</button>
@@ -444,6 +480,28 @@ export default function InsightsPage() {
             ▶
           </button>
         </div>
+      </div>}
+
+      {/* Metric toggle */}
+      <div style={styles.metricRow}>
+        {[
+          { key: 'expenses', labelFr: 'Dépenses', labelEn: 'Expenses', color: '#E74C3C' },
+          { key: 'income',   labelFr: 'Revenus',  labelEn: 'Income',   color: '#00B894' },
+          { key: 'balance',  labelFr: 'Balance',  labelEn: 'Balance',  color: '#00A3E0' },
+        ].map(m => (
+          <button
+            key={m.key}
+            onClick={() => setMetricType(m.key)}
+            style={{
+              ...styles.metricBtn,
+              backgroundColor: metricType === m.key ? m.color : 'white',
+              color: metricType === m.key ? 'white' : m.color,
+              borderColor: m.color,
+            }}
+          >
+            {t(m.labelFr, m.labelEn)}
+          </button>
+        ))}
       </div>
 
       {/* Tabs */}
@@ -485,25 +543,23 @@ export default function InsightsPage() {
               </div>
             </div>
             
-            <div style={styles.kpiCard}>
-              <span style={styles.kpiIcon}>{kpiData.diff <= 0 ? '📉' : '📈'}</span>
-              <div>
-                <span style={styles.kpiLabel}>vs {kpiData.prevLabel}</span>
-                <span style={{
-                  ...styles.kpiValue,
-                  color: kpiData.diff <= 0 ? '#00B894' : '#E74C3C',
-                  fontSize: '16px',
-                }}>
-                  {kpiData.diff > 0 ? '+' : ''}{kpiData.diff.toFixed(0)}%
-                </span>
+            {kpiData.diff !== null && (
+              <div style={styles.kpiCard}>
+                <span style={styles.kpiIcon}>{kpiData.diff <= 0 ? '📉' : '📈'}</span>
+                <div>
+                  <span style={styles.kpiLabel}>vs {kpiData.prevLabel}</span>
+                  <span style={{ ...styles.kpiValue, color: kpiData.diff <= 0 ? '#00B894' : '#E74C3C', fontSize: '16px' }}>
+                    {kpiData.diff > 0 ? '+' : ''}{kpiData.diff.toFixed(0)}%
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div style={styles.kpiCard}>
               <span style={styles.kpiIcon}>📅</span>
               <div>
                 <span style={styles.kpiLabel}>
-                  {viewMode === 'monthly' ? t('Moy/jour', 'Avg/day') : t('Moy/mois', 'Avg/month')}
+                  {viewMode === 'monthly' ? t('Moy/jour', 'Avg/day') : viewMode === 'alltime' ? t('Moy/an', 'Avg/year') : t('Moy/mois', 'Avg/month')}
                 </span>
                 <span style={styles.kpiValue}>{formatAmount(kpiData.avg)}</span>
               </div>
@@ -593,6 +649,33 @@ export default function InsightsPage() {
             </div>
           )}
 
+          {/* ALL-TIME: one bar per year */}
+          {viewMode === 'alltime' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>
+                📊 {t('Vue d\'ensemble — toute la base', 'Full database overview')}
+              </h2>
+              <div style={styles.chartCard}>
+                {allTimeChartData.length === 0 ? (
+                  <p style={styles.emptyText}>{t('Aucune donnée', 'No data')}</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={allTimeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                      <Tooltip formatter={(value) => formatAmount(value)} />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {allTimeChartData.map((entry, i) => (
+                          <Cell key={i} fill={YEAR_COLORS[i % YEAR_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* MONTHLY: Category comparison across years */}
           {viewMode === 'monthly' && monthlyChartData.data.length > 0 && (
             <div style={styles.section}>
@@ -631,7 +714,7 @@ export default function InsightsPage() {
         <>
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>
-              🥧 {t('Répartition', 'Breakdown')} - {viewMode === 'monthly' ? monthNames[selectedMonth] : selectedYear}
+              🥧 {t('Répartition', 'Breakdown')} - {viewMode === 'alltime' ? t('Toutes les années', 'All years') : viewMode === 'monthly' ? monthNames[selectedMonth] : selectedYear}
             </h2>
             <div style={styles.chartCard}>
               {pieData.length === 0 ? (
@@ -702,7 +785,7 @@ export default function InsightsPage() {
       {activeTab === 'merchants' && (
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>
-            🏪 Top {t('Bénéficiaires', 'Merchants')} - {viewMode === 'monthly' ? monthNames[selectedMonth] : selectedYear}
+            🏪 Top {t('Bénéficiaires', 'Merchants')} - {viewMode === 'alltime' ? t('Toutes les années', 'All years') : viewMode === 'monthly' ? monthNames[selectedMonth] : selectedYear}
           </h2>
           <div style={styles.merchantList}>
             {merchantData.length === 0 ? (
@@ -740,6 +823,35 @@ export default function InsightsPage() {
 const styles = {
   container: {
     padding: '20px 16px 100px',
+  },
+  accountRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  accountBtn: {
+    padding: '6px 18px',
+    borderRadius: '20px',
+    border: '2px solid',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.15s',
+  },
+  metricRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  metricBtn: {
+    flex: 1,
+    padding: '7px 4px',
+    borderRadius: '20px',
+    border: '2px solid',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '600',
+    transition: 'all 0.15s',
   },
   headerRow: {
     display: 'flex',

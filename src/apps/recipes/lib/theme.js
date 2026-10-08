@@ -1,14 +1,15 @@
 const systemFont = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
 export const colors = {
-  forest: '#2D5A3D', forestLight: '#3D7A52', forestDark: '#1D4A2D',
+  forest: '#1B6B3A', forestLight: '#28894D', forestDark: '#145A2E',
   terracotta: '#C17A5E', terracottaLight: '#D4917A',
-  gold: '#D4A853', goldLight: '#E5C17A',
-  cream: '#F5F7FA', warmGray: '#E1E8ED', warmGrayDark: '#BDC3C7',
-  textPrimary: '#2D3436', textSecondary: '#636E72', textMuted: '#8A92A0',
-  white: '#FFFFFF', error: '#C75050', errorLight: '#FEF2F2',
-  success: '#2D5A3D', successLight: '#F0F7F2',
-  accent: '#00A3E0', accentLight: '#F0F9FF'
+  gold: '#C9982E', goldLight: '#E5C17A',
+  cream: '#F8FAFB', warmGray: '#E8ECF0', warmGrayDark: '#CDD4DA',
+  textPrimary: '#1A1D1F', textSecondary: '#6F767E', textMuted: '#9A9FA5',
+  white: '#FFFFFF', error: '#D44333', errorLight: '#FFF4F2',
+  success: '#1B6B3A', successLight: '#EEFBF3',
+  accent: '#2A85FF', accentLight: '#F0F7FF',
+  background: '#F4F5F6',
 }
 
 export const fonts = {
@@ -27,36 +28,37 @@ export const spacing = {
 }
 
 export const borderRadius = {
-  sm: '6px', md: '8px', lg: '10px', xl: '12px', full: '9999px'
+  sm: '8px', md: '12px', lg: '16px', xl: '20px', full: '9999px'
 }
 
 export const shadows = {
-  sm: '0 2px 8px rgba(0,0,0,0.04)',
-  md: '0 4px 6px rgba(0,0,0,0.07)',
-  lg: '0 10px 15px rgba(0,0,0,0.1)'
+  sm: '0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+  md: '0 2px 4px rgba(0,0,0,0.04), 0 4px 8px rgba(0,0,0,0.06)',
+  lg: '0 4px 8px rgba(0,0,0,0.04), 0 12px 24px rgba(0,0,0,0.08)'
 }
 
 export const commonStyles = {
   buttonBase: {
     fontFamily: systemFont, fontSize: '15px', fontWeight: 600,
-    padding: '8px 16px', borderRadius: '8px',
+    padding: '10px 20px', borderRadius: '12px',
     border: 'none', cursor: 'pointer',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    transition: 'all 0.2s ease'
   },
   buttonPrimary: { backgroundColor: colors.forest, color: colors.white },
-  buttonSecondary: { backgroundColor: '#F5F7FA', color: colors.textPrimary },
+  buttonSecondary: { backgroundColor: colors.background, color: colors.textPrimary },
   buttonDanger: { backgroundColor: colors.error, color: colors.white },
   input: {
-    fontFamily: systemFont, fontSize: '15px', padding: '10px 14px',
-    borderRadius: '8px', border: `1px solid ${colors.warmGrayDark}`,
+    fontFamily: systemFont, fontSize: '15px', padding: '12px 16px',
+    borderRadius: '12px', border: `1.5px solid ${colors.warmGray}`,
     backgroundColor: colors.white, color: colors.textPrimary,
-    width: '100%', outline: 'none'
+    width: '100%', outline: 'none', transition: 'border-color 0.2s ease'
   },
-  card: { backgroundColor: colors.white, borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  card: { backgroundColor: colors.white, borderRadius: '16px', padding: '16px', boxShadow: shadows.sm },
   label: {
     fontFamily: systemFont, fontSize: '12px', fontWeight: 600,
     color: colors.textSecondary, marginBottom: '6px', display: 'block',
-    textTransform: 'uppercase', letterSpacing: '0.4px'
+    textTransform: 'uppercase', letterSpacing: '0.5px'
   }
 }
 

@@ -4,8 +4,7 @@ import {
   getTags, createTag as apiCreateTag, updateTag as apiUpdateTag, deleteTag as apiDeleteTag,
   getBases, createBase as apiCreateBase, updateBase as apiUpdateBase, deleteBase as apiDeleteBase,
   getCuisines,
-  getShoppingCategories, createShoppingCategory as apiCreateShoppingCategory, createShoppingCategories as apiCreateShoppingCategories,
-  updateShoppingCategory as apiUpdateShoppingCategory, deleteShoppingCategory as apiDeleteShoppingCategory,
+  getIngredientCategories, createIngredientCategory as apiCreateIngredientCategory, updateIngredientCategory as apiUpdateIngredientCategory, deleteIngredientCategory as apiDeleteIngredientCategory,
   getIngredients, createIngredient as apiCreateIngredient, updateIngredient as apiUpdateIngredient, deleteIngredient as apiDeleteIngredient,
   getRecipes, createRecipe as apiCreateRecipe, updateRecipe as apiUpdateRecipe, deleteRecipe as apiDeleteRecipe,
   getMealPlans, createMealPlan as apiCreateMealPlan, deleteMealPlan as apiDeleteMealPlan,
@@ -32,11 +31,11 @@ export function RecipeProvider({ children }) {
   const [tags, setTags] = useState([])
   const [bases, setBases] = useState([])
   const [cuisines, setCuisines] = useState([])
+  const [ingredientCategories, setIngredientCategories] = useState([])
   const [ingredients, setIngredients] = useState([])
   const [recipes, setRecipes] = useState([])
   const [mealPlans, setMealPlans] = useState([])
   const [shoppingItems, setShoppingItems] = useState([])
-  const [shoppingCategories, setShoppingCategories] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
   const [currentTab, setCurrentTab] = useState('recipes')
 
@@ -56,25 +55,22 @@ export function RecipeProvider({ children }) {
 
   useEffect(() => {
     if (!user) {
-      setProfile(null); setTags([]); setBases([]); setIngredients([])
-      setRecipes([]); setMealPlans([]); setShoppingItems([]); setShoppingCategories([])
+      setProfile(null); setTags([]); setBases([]); setIngredientCategories([]); setIngredients([])
+      setRecipes([]); setMealPlans([]); setShoppingItems([])
       return
     }
     let mounted = true
     async function loadUserData() {
       setDataLoading(true)
       try {
-        const [profileData, tagsData, basesData, cuisinesData, ingredientsData, recipesData, shoppingData, categoriesData] = await Promise.all([
+        const [profileData, tagsData, basesData, cuisinesData, ingredientCategoriesData, ingredientsData, recipesData, shoppingData] = await Promise.all([
           getProfile(user.id), getTags(user.id), getBases(user.id), getCuisines(),
-          getIngredients(user.id), getRecipes(user.id), getShoppingItems(user.id),
-          // Tolérant : la table n'existe pas tant que la migration n'est pas appliquée
-          getShoppingCategories(user.id).catch(() => [])
+          getIngredientCategories(user.id), getIngredients(user.id), getRecipes(user.id), getShoppingItems(user.id)
         ])
         if (mounted) {
           setProfile(profileData); setTags(tagsData); setBases(basesData)
-          setCuisines(cuisinesData); setIngredients(ingredientsData)
+          setCuisines(cuisinesData); setIngredientCategories(ingredientCategoriesData); setIngredients(ingredientsData)
           setRecipes(recipesData); setShoppingItems(shoppingData)
-          setShoppingCategories(categoriesData)
         }
       } catch (error) {
         console.error('Load recipe data error:', error)
@@ -130,6 +126,30 @@ export function RecipeProvider({ children }) {
     await apiDeleteBase(baseId)
     setBases(prev => prev.filter(b => b.id !== baseId))
     setRecipes(prev => prev.map(r => r.base_id === baseId ? { ...r, base_id: null, base: null } : r))
+  }, [])
+
+  // ============================================
+  // INGREDIENT CATEGORY ACTIONS
+  // ============================================
+
+  const createIngredientCategory = useCallback(async (categoryData) => {
+    if (!user) return
+    const newCategory = await apiCreateIngredientCategory(user.id, categoryData)
+    setIngredientCategories(prev => [...prev, newCategory].sort((a, b) => a.sort_order - b.sort_order))
+    return newCategory
+  }, [user])
+
+  const updateIngredientCategory = useCallback(async (categoryId, categoryData) => {
+    const updated = await apiUpdateIngredientCategory(categoryId, categoryData)
+    setIngredientCategories(prev => prev.map(c => c.id === categoryId ? updated : c))
+    return updated
+  }, [])
+
+  const deleteIngredientCategory = useCallback(async (categoryId) => {
+    await apiDeleteIngredientCategory(categoryId)
+    setIngredientCategories(prev => prev.filter(c => c.id !== categoryId))
+    // Clear category_id on affected ingredients
+    setIngredients(prev => prev.map(i => i.category_id === categoryId ? { ...i, category_id: null, category: null } : i))
   }, [])
 
   // ============================================
@@ -243,61 +263,6 @@ export function RecipeProvider({ children }) {
   }, [user])
 
   // ============================================
-  // SHOPPING CATEGORY ACTIONS
-  // ============================================
-
-  const sortCategories = (list) => [...list].sort((a, b) => (a.sort_order - b.sort_order) || a.name_fr.localeCompare(b.name_fr))
-
-  const createShoppingCategory = useCallback(async (categoryData) => {
-    if (!user) return
-    const sortOrder = shoppingCategories.reduce((max, c) => Math.max(max, c.sort_order ?? 0), 0) + 1
-    const created = await apiCreateShoppingCategory(user.id, { sort_order: sortOrder, ...categoryData })
-    setShoppingCategories(prev => sortCategories([...prev, created]))
-    return created
-  }, [user, shoppingCategories])
-
-  const seedDefaultShoppingCategories = useCallback(async (defaults) => {
-    if (!user) return
-    const created = await apiCreateShoppingCategories(user.id, defaults.map((c, i) => ({ ...c, sort_order: i + 1 })))
-    setShoppingCategories(sortCategories(created))
-    return created
-  }, [user])
-
-  const updateShoppingCategory = useCallback(async (categoryId, categoryData) => {
-    const updated = await apiUpdateShoppingCategory(categoryId, categoryData)
-    setShoppingCategories(prev => sortCategories(prev.map(c => c.id === categoryId ? updated : c)))
-    return updated
-  }, [])
-
-  // Applique un nouvel ordre (liste d'ids) : mise à jour optimiste puis persistance
-  const reorderShoppingCategories = useCallback(async (orderedIds) => {
-    const previous = shoppingCategories
-    const byId = new Map(previous.map(c => [c.id, c]))
-    const next = orderedIds.map((id, i) => ({ ...byId.get(id), sort_order: i + 1 }))
-    setShoppingCategories(next)
-    try {
-      await Promise.all(
-        next.filter(c => byId.get(c.id).sort_order !== c.sort_order)
-          .map(c => apiUpdateShoppingCategory(c.id, { sort_order: c.sort_order }))
-      )
-    } catch (error) {
-      setShoppingCategories(previous)
-      throw error
-    }
-  }, [shoppingCategories])
-
-  const deleteShoppingCategory = useCallback(async (categoryId) => {
-    await apiDeleteShoppingCategory(categoryId)
-    setShoppingCategories(prev => prev.filter(c => c.id !== categoryId))
-    setIngredients(prev => prev.map(i => i.category_id === categoryId ? { ...i, category_id: null } : i))
-    setShoppingItems(prev => prev.map(i => ({
-      ...i,
-      category_id: i.category_id === categoryId ? null : i.category_id,
-      ingredient: i.ingredient?.category_id === categoryId ? { ...i.ingredient, category_id: null } : i.ingredient
-    })))
-  }, [])
-
-  // ============================================
   // CONTEXT VALUE
   // ============================================
 
@@ -310,7 +275,7 @@ export function RecipeProvider({ children }) {
     updateLanguage,
 
     // Recipe data
-    profile, tags, bases, cuisines, ingredients, recipes, mealPlans, shoppingItems, shoppingCategories, dataLoading,
+    profile, tags, bases, cuisines, ingredientCategories, ingredients, recipes, mealPlans, shoppingItems, dataLoading,
 
     // UI
     currentTab, setCurrentTab,
@@ -321,6 +286,9 @@ export function RecipeProvider({ children }) {
     // Base actions
     createBase, updateBase, deleteBase,
 
+    // Ingredient category actions
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
+
     // Ingredient actions
     createIngredient, updateIngredient, deleteIngredient,
 
@@ -330,24 +298,19 @@ export function RecipeProvider({ children }) {
     // Meal plan actions
     loadMealPlans, createMealPlan, deleteMealPlan,
 
-    // Shopping category actions
-    createShoppingCategory, seedDefaultShoppingCategories, updateShoppingCategory,
-    reorderShoppingCategories, deleteShoppingCategory,
-
     // Shopping actions
     createShoppingItem, createShoppingItems, updateShoppingItem,
     deleteShoppingItem, deleteCheckedShoppingItems, deleteAllShoppingItems,
   }), [
     auth, t, getName, updateLanguage,
-    profile, tags, bases, cuisines, ingredients, recipes, mealPlans, shoppingItems, shoppingCategories, dataLoading,
+    profile, tags, bases, cuisines, ingredientCategories, ingredients, recipes, mealPlans, shoppingItems, dataLoading,
     currentTab,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
     createIngredient, updateIngredient, deleteIngredient,
     createRecipe, updateRecipe, deleteRecipe,
     loadMealPlans, createMealPlan, deleteMealPlan,
-    createShoppingCategory, seedDefaultShoppingCategories, updateShoppingCategory,
-    reorderShoppingCategories, deleteShoppingCategory,
     createShoppingItem, createShoppingItems, updateShoppingItem,
     deleteShoppingItem, deleteCheckedShoppingItems, deleteAllShoppingItems,
   ])

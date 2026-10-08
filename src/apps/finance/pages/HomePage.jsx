@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import { 
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer 
+import { useMemo, useState } from 'react';
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { useApp } from '../context/AppContext';
 
@@ -12,8 +12,8 @@ import { useApp } from '../context/AppContext';
 const CHART_COLORS = ['#00A3E0', '#003D5B', '#E67E22', '#00B894', '#9B59B6', '#E74C3C', '#F39C12', '#1ABC9C'];
 
 export default function HomePage() {
-  const { 
-    t, language, transactions, categories, subcategories, budgets,
+  const {
+    t, language, transactions, categories, subcategories, budgets, accounts,
     formatAmount, formatDate, getSubcategory, getCategoryForSubcategory, getAccount
   } = useApp();
 
@@ -21,38 +21,50 @@ export default function HomePage() {
   const thisMonth = today.getMonth();
   const thisYear = today.getFullYear();
 
+  // Default to "Commun" account; fall back to first account if not found yet
+  const communAccount = useMemo(
+    () => accounts.find(a => a.name.toLowerCase() === 'commun') || accounts[0],
+    [accounts]
+  );
+  const [selectedAccountId, setSelectedAccountId] = useState(null);
+  // Resolve: null means "use communAccount once loaded"
+  const activeAccountId = selectedAccountId ?? communAccount?.id ?? null;
+
+  // Filter transactions by selected account
+  const accountTx = useMemo(
+    () => activeAccountId ? transactions.filter(tx => tx.account_id === activeAccountId) : transactions,
+    [transactions, activeAccountId]
+  );
+
   // ============================================================================
   // CALCULATIONS
   // ============================================================================
 
   // This month's transactions
   const thisMonthTx = useMemo(() => {
-    return transactions.filter(tx => {
+    return accountTx.filter(tx => {
       const d = new Date(tx.date);
       return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
     });
-  }, [transactions, thisMonth, thisYear]);
+  }, [accountTx, thisMonth, thisYear]);
 
   // Last month's transactions
   const lastMonthTx = useMemo(() => {
     const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
     const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
-    return transactions.filter(tx => {
+    return accountTx.filter(tx => {
       const d = new Date(tx.date);
       return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
     });
-  }, [transactions, thisMonth, thisYear]);
+  }, [accountTx, thisMonth, thisYear]);
 
-  // KPI values
-  const thisMonthTotal = thisMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
-  const lastMonthTotal = lastMonthTx.reduce((sum, tx) => sum + tx.amount, 0);
-  const monthDiff = lastMonthTotal > 0 
-    ? ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100 
-    : 0;
-
-  // Average transaction
-  const avgTransaction = thisMonthTx.length > 0 
-    ? thisMonthTotal / thisMonthTx.length 
+  // KPI values — income and expenses kept separate
+  const thisMonthIncome   = thisMonthTx.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
+  const thisMonthExpenses = thisMonthTx.filter(tx => (tx.type || 'expense') === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+  const thisMonthBalance  = thisMonthIncome - thisMonthExpenses;
+  const lastMonthExpenses = lastMonthTx.filter(tx => (tx.type || 'expense') === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
+  const expenseDiff = lastMonthExpenses > 0
+    ? ((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100
     : 0;
 
   // ============================================================================
@@ -68,21 +80,28 @@ export default function HomePage() {
       const d = new Date(thisYear, thisMonth - i, 1);
       const month = d.getMonth();
       const year = d.getFullYear();
-      
-      const total = transactions
-        .filter(tx => {
-          const txDate = new Date(tx.date);
-          return txDate.getMonth() === month && txDate.getFullYear() === year;
-        })
+
+      const monthTx = accountTx.filter(tx => {
+        const txDate = new Date(tx.date);
+        return txDate.getMonth() === month && txDate.getFullYear() === year;
+      });
+
+      const expenses = monthTx
+        .filter(tx => !tx.type || tx.type === 'expense')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      const income = monthTx
+        .filter(tx => tx.type === 'income')
         .reduce((sum, tx) => sum + tx.amount, 0);
 
       months.push({
         name: monthNames[month],
-        total: Math.round(total),
+        [t('Revenus', 'Income')]: Math.round(income),
+        [t('Dépenses', 'Expenses')]: Math.round(expenses),
+        [t('Balance', 'Balance')]: Math.round(income - expenses),
       });
     }
     return months;
-  }, [transactions, thisMonth, thisYear, language]);
+  }, [accountTx, thisMonth, thisYear, language]);
 
   // ============================================================================
   // CATEGORY BREAKDOWN (this month)
@@ -118,10 +137,10 @@ export default function HomePage() {
   // RECENT TRANSACTIONS
   // ============================================================================
   const recentTransactions = useMemo(() => {
-    return [...transactions]
+    return [...accountTx]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
-  }, [transactions]);
+  }, [accountTx]);
 
   // ============================================================================
   // BUDGET ALERTS
@@ -180,43 +199,61 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* Account selector */}
+      {accounts.length > 1 && (
+        <div style={styles.accountRow}>
+          {accounts.map(account => (
+            <button
+              key={account.id}
+              onClick={() => setSelectedAccountId(account.id)}
+              style={{
+                ...styles.accountBtn,
+                backgroundColor: activeAccountId === account.id ? account.color : 'white',
+                color: activeAccountId === account.id ? 'white' : account.color,
+                borderColor: account.color,
+              }}
+            >
+              {account.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div style={styles.kpiGrid}>
         <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>💸</span>
+          <span style={styles.kpiIcon}>💰</span>
           <div>
-            <span style={styles.kpiLabel}>{t('Ce mois', 'This month')}</span>
-            <span style={styles.kpiValue}>{formatAmount(thisMonthTotal)}</span>
+            <span style={styles.kpiLabel}>{t('Revenus', 'Income')}</span>
+            <span style={{ ...styles.kpiValue, color: '#00B894' }}>{formatAmount(thisMonthIncome)}</span>
           </div>
         </div>
-        
+
         <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>{monthDiff <= 0 ? '📉' : '📈'}</span>
+          <span style={styles.kpiIcon}>💸</span>
           <div>
-            <span style={styles.kpiLabel}>{t('vs mois dernier', 'vs last month')}</span>
-            <span style={{
-              ...styles.kpiValue,
-              color: monthDiff <= 0 ? '#00B894' : '#E74C3C',
-              fontSize: '18px',
-            }}>
-              {monthDiff > 0 ? '+' : ''}{monthDiff.toFixed(0)}%
+            <span style={styles.kpiLabel}>{t('Dépenses', 'Expenses')}</span>
+            <span style={{ ...styles.kpiValue, color: '#E74C3C' }}>{formatAmount(thisMonthExpenses)}</span>
+          </div>
+        </div>
+
+        <div style={styles.kpiCard}>
+          <span style={styles.kpiIcon}>{thisMonthBalance >= 0 ? '🏦' : '⚠️'}</span>
+          <div>
+            <span style={styles.kpiLabel}>{t('Balance', 'Balance')}</span>
+            <span style={{ ...styles.kpiValue, color: thisMonthBalance >= 0 ? '#00B894' : '#E74C3C' }}>
+              {thisMonthBalance >= 0 ? '+' : ''}{formatAmount(thisMonthBalance)}
             </span>
           </div>
         </div>
 
         <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>🧾</span>
+          <span style={styles.kpiIcon}>{expenseDiff <= 0 ? '📉' : '📈'}</span>
           <div>
-            <span style={styles.kpiLabel}>{t('Transactions', 'Transactions')}</span>
-            <span style={styles.kpiValue}>{thisMonthTx.length}</span>
-          </div>
-        </div>
-
-        <div style={styles.kpiCard}>
-          <span style={styles.kpiIcon}>📊</span>
-          <div>
-            <span style={styles.kpiLabel}>{t('Moyenne', 'Average')}</span>
-            <span style={styles.kpiValue}>{formatAmount(avgTransaction)}</span>
+            <span style={styles.kpiLabel}>{t('Dép. vs mois préc.', 'Exp. vs last month')}</span>
+            <span style={{ ...styles.kpiValue, color: expenseDiff <= 0 ? '#00B894' : '#E74C3C', fontSize: '18px' }}>
+              {expenseDiff > 0 ? '+' : ''}{expenseDiff.toFixed(0)}%
+            </span>
           </div>
         </div>
       </div>
@@ -259,41 +296,53 @@ export default function HomePage() {
 
       {/* Spending Trend */}
       <div style={styles.section}>
-        <h2 style={styles.sectionTitle}>📈 {t('Tendance des dépenses', 'Spending trend')}</h2>
+        <h2 style={styles.sectionTitle}>📈 {t('Tendance financière', 'Financial trend')}</h2>
         <div style={styles.chartCard}>
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#00A3E0" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#00A3E0" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis 
-                dataKey="name" 
-                axisLine={false} 
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <XAxis
+                dataKey="name"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: '#636E72' }}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 11, fill: '#636E72' }}
                 tickFormatter={v => `${(v/1000).toFixed(0)}k`}
               />
-              <Tooltip 
-                formatter={(value) => [`€${value}`, t('Total', 'Total')]}
+              <Tooltip
+                formatter={(value) => [`€${value}`]}
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="total" 
-                stroke="#00A3E0" 
+              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
+              <Line
+                type="monotone"
+                dataKey={t('Revenus', 'Income')}
+                stroke="#00B894"
                 strokeWidth={2}
-                fillOpacity={1} 
-                fill="url(#colorTotal)" 
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
               />
-            </AreaChart>
+              <Line
+                type="monotone"
+                dataKey={t('Dépenses', 'Expenses')}
+                stroke="#E74C3C"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey={t('Balance', 'Balance')}
+                stroke="#00A3E0"
+                strokeWidth={2}
+                strokeDasharray="4 2"
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -402,6 +451,20 @@ const styles = {
     fontSize: '14px',
     color: '#636E72',
     marginTop: '4px',
+  },
+  accountRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  accountBtn: {
+    padding: '6px 18px',
+    borderRadius: '20px',
+    border: '2px solid',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.15s',
   },
   kpiGrid: {
     display: 'grid',

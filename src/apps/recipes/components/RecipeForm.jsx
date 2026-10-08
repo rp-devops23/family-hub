@@ -133,7 +133,7 @@ export default function RecipeForm({ recipe, onClose }) {
               placeholder={t('recipe.name.placeholder')}
               style={{
                 ...styles.input,
-                borderColor: isDuplicate ? colors.error : colors.warmGrayDark
+                borderColor: isDuplicate ? colors.error : colors.warmGray
               }}
               required
               autoFocus
@@ -153,9 +153,9 @@ export default function RecipeForm({ recipe, onClose }) {
                   onClick={() => setMealType(type)}
                   style={{
                     ...styles.chip,
-                    backgroundColor: mealType === type ? colors.terracotta + '25' : colors.warmGray,
+                    backgroundColor: mealType === type ? colors.terracotta + '1A' : colors.background,
                     color: mealType === type ? colors.terracotta : colors.textSecondary,
-                    borderColor: mealType === type ? colors.terracotta : 'transparent'
+                    borderColor: mealType === type ? colors.terracotta + '40' : 'transparent'
                   }}
                 >
                   {getMealTypeEmoji(type)} {t(`mealType.${type}`)}
@@ -174,9 +174,9 @@ export default function RecipeForm({ recipe, onClose }) {
                   onClick={() => handleSeasonToggle(season)}
                   style={{
                     ...styles.chip,
-                    backgroundColor: seasons.includes(season) ? getSeasonColor(season) + '30' : colors.warmGray,
+                    backgroundColor: seasons.includes(season) ? getSeasonColor(season) + '1A' : colors.background,
                     color: seasons.includes(season) ? getSeasonColor(season) : colors.textSecondary,
-                    borderColor: seasons.includes(season) ? getSeasonColor(season) : 'transparent'
+                    borderColor: seasons.includes(season) ? getSeasonColor(season) + '40' : 'transparent'
                   }}
                 >
                   {getSeasonEmoji(season)} {t(`season.${season}`)}
@@ -195,9 +195,9 @@ export default function RecipeForm({ recipe, onClose }) {
                   onClick={() => handleTagToggle(tag.id)}
                   style={{
                     ...styles.chip,
-                    backgroundColor: selectedTags.includes(tag.id) ? colors.forest + '20' : colors.warmGray,
+                    backgroundColor: selectedTags.includes(tag.id) ? colors.forest + '18' : colors.background,
                     color: selectedTags.includes(tag.id) ? colors.forest : colors.textSecondary,
-                    borderColor: selectedTags.includes(tag.id) ? colors.forest : 'transparent'
+                    borderColor: selectedTags.includes(tag.id) ? colors.forest + '40' : 'transparent'
                   }}
                 >
                   {tag.icon} {getName(tag)}
@@ -237,9 +237,9 @@ export default function RecipeForm({ recipe, onClose }) {
                     onClick={() => setDifficulty(diff)}
                     style={{
                       ...styles.chipSmall,
-                      backgroundColor: difficulty === diff ? colors.forest + '20' : colors.warmGray,
+                      backgroundColor: difficulty === diff ? colors.forest + '18' : colors.background,
                       color: difficulty === diff ? colors.forest : colors.textSecondary,
-                      borderColor: difficulty === diff ? colors.forest : 'transparent'
+                      borderColor: difficulty === diff ? colors.forest + '40' : 'transparent'
                     }}
                   >
                     {t(`difficulty.${diff}`)}
@@ -258,9 +258,9 @@ export default function RecipeForm({ recipe, onClose }) {
                     onClick={() => setPriceRange(price)}
                     style={{
                       ...styles.chipSmall,
-                      backgroundColor: priceRange === price ? colors.gold + '30' : colors.warmGray,
+                      backgroundColor: priceRange === price ? colors.gold + '1A' : colors.background,
                       color: priceRange === price ? colors.gold : colors.textSecondary,
-                      borderColor: priceRange === price ? colors.gold : 'transparent'
+                      borderColor: priceRange === price ? colors.gold + '40' : 'transparent'
                     }}
                   >
                     {getPriceRangeSymbol(price)} {t(`priceRange.${price}`)}
@@ -327,27 +327,27 @@ export default function RecipeForm({ recipe, onClose }) {
 }
 
 const styles = {
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: spacing.md, paddingTop: spacing.xl, zIndex: 1000, overflowY: 'auto' },
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: spacing.md, paddingTop: spacing.xl, zIndex: 1000, overflowY: 'auto' },
   modal: { backgroundColor: colors.white, borderRadius: borderRadius.xl, width: '100%', maxWidth: '500px', maxHeight: 'calc(100vh - 100px)', overflowY: 'auto', boxShadow: shadows.lg },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md, borderBottom: `1px solid ${colors.warmGray}`, position: 'sticky', top: 0, backgroundColor: colors.white, zIndex: 1 },
-  title: { fontFamily: fonts.heading, fontSize: fontSizes.xl, color: colors.forest, margin: 0 },
-  closeButton: { width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.warmGray, borderRadius: borderRadius.full, cursor: 'pointer', fontSize: fontSizes.md, color: colors.textSecondary },
-  form: { padding: spacing.md, display: 'flex', flexDirection: 'column', gap: spacing.md },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}`, position: 'sticky', top: 0, backgroundColor: colors.white, zIndex: 1, borderRadius: `${borderRadius.xl} ${borderRadius.xl} 0 0` },
+  title: { fontFamily: fonts.heading, fontSize: fontSizes.xl, color: colors.forest, margin: 0, fontWeight: 700 },
+  closeButton: { width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.background, borderRadius: '10px', cursor: 'pointer', fontSize: fontSizes.md, color: colors.textSecondary, transition: 'all 0.2s ease' },
+  form: { padding: '20px', display: 'flex', flexDirection: 'column', gap: spacing.md },
   field: { display: 'flex', flexDirection: 'column' },
   rowFields: { display: 'flex', gap: spacing.md },
   halfField: { flex: 1, display: 'flex', flexDirection: 'column' },
-  input: { ...commonStyles.input, padding: spacing.sm },
-  select: { ...commonStyles.input, padding: spacing.sm, cursor: 'pointer' },
-  textarea: { ...commonStyles.input, padding: spacing.sm, resize: 'vertical', fontFamily: fonts.body },
-  chipGroup: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs },
-  chipGroupVertical: { display: 'flex', flexDirection: 'column', gap: spacing.xs },
-  chip: { padding: `${spacing.xs} ${spacing.sm}`, borderRadius: borderRadius.full, border: '2px solid transparent', fontSize: fontSizes.sm, fontFamily: fonts.body, cursor: 'pointer' },
-  chipSmall: { padding: `${spacing.xs} ${spacing.sm}`, borderRadius: borderRadius.md, border: '2px solid transparent', fontSize: fontSizes.sm, fontFamily: fonts.body, cursor: 'pointer', textAlign: 'left' },
+  input: { ...commonStyles.input, padding: '10px 14px' },
+  select: { ...commonStyles.input, padding: '10px 14px', cursor: 'pointer' },
+  textarea: { ...commonStyles.input, padding: '10px 14px', resize: 'vertical', fontFamily: fonts.body },
+  chipGroup: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+  chipGroupVertical: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  chip: { padding: '6px 12px', borderRadius: borderRadius.full, border: '1.5px solid transparent', fontSize: fontSizes.sm, fontFamily: fonts.body, cursor: 'pointer', transition: 'all 0.2s ease', fontWeight: 500 },
+  chipSmall: { padding: '6px 12px', borderRadius: borderRadius.md, border: '1.5px solid transparent', fontSize: fontSizes.sm, fontFamily: fonts.body, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease', fontWeight: 500 },
   errorText: { fontSize: fontSizes.sm, color: colors.error, marginTop: spacing.xs },
-  error: { backgroundColor: colors.errorLight, color: colors.error, padding: spacing.sm, borderRadius: borderRadius.md, fontSize: fontSizes.sm, textAlign: 'center' },
+  error: { backgroundColor: colors.errorLight, color: colors.error, padding: '10px 14px', borderRadius: borderRadius.md, fontSize: fontSizes.sm, textAlign: 'center' },
   actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md, borderTop: `1px solid ${colors.warmGray}`, marginTop: spacing.sm },
   actionsRight: { display: 'flex', gap: spacing.sm },
-  deleteButton: { ...commonStyles.buttonBase, backgroundColor: 'transparent', color: colors.error, border: `1px solid ${colors.error}` },
+  deleteButton: { ...commonStyles.buttonBase, backgroundColor: 'transparent', color: colors.error, border: `1.5px solid ${colors.error}` },
   cancelButton: { ...commonStyles.buttonBase, ...commonStyles.buttonSecondary },
   saveButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary }
 }

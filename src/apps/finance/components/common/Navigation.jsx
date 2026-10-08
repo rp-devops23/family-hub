@@ -12,6 +12,7 @@ export default function Navigation({ activeTab, onTabChange }) {
     { id: 'transactions', icon: '💳', labelFr: 'Transactions', labelEn: 'Transactions' },
     { id: 'recurring', icon: '🔄', labelFr: 'Récurrences', labelEn: 'Recurring' },
     { id: 'budgets', icon: '🐷', labelFr: 'Budgets', labelEn: 'Budgets' },
+    { id: 'dashboard', icon: '🎯', labelFr: 'Tableau', labelEn: 'Dashboard' },
     { id: 'insights', icon: '📊', labelFr: 'Analyses', labelEn: 'Insights' },
   ];
 

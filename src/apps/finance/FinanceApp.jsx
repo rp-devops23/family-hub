@@ -8,6 +8,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import BudgetsPage from './pages/BudgetsPage';
 import InsightsPage from './pages/InsightsPage';
 import RecurringPage from './pages/RecurringPage';
+import DashboardPage from './pages/DashboardPage';
 
 export default function FinanceApp({ onHome }) {
   const { setupLoading, dataLoading, t } = useApp();
@@ -42,6 +43,7 @@ export default function FinanceApp({ onHome }) {
       case 'transactions': return <TransactionsPage />;
       case 'recurring': return <RecurringPage />;
       case 'budgets': return <BudgetsPage />;
+      case 'dashboard': return <DashboardPage />;
       case 'insights': return <InsightsPage />;
       default: return <HomePage />;
     }

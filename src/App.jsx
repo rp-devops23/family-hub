@@ -5,7 +5,12 @@ import LoginPage from './apps/finance/pages/LoginPage';
 import FinanceApp from './apps/finance/FinanceApp';
 import RecipeApp from './apps/recipes/RecipeApp';
 import AgentApp from './apps/agent/AgentApp';
+import CorveesApp from './apps/corvees/CorveesApp';
+import TravauxApp from './apps/travaux/TravauxApp';
+import ShoppingApp from './apps/shopping/ShoppingApp';
+import HolidayApp from './apps/holiday/HolidayApp';
 import PortalPage from './portal/PortalPage';
+import GoogleCallbackPage from './apps/agent/components/GoogleCallbackPage';
 import './App.css';
 
 function AppInner() {
@@ -25,6 +30,14 @@ function AppInner() {
 
   if (!user) return <LoginPage />;
 
+  // Handle Google OAuth callback redirect
+  if (window.location.pathname === '/auth/google/callback') {
+    return <GoogleCallbackPage onDone={() => {
+      window.history.replaceState({}, '', '/');
+      setActiveApp('agent');
+    }} />;
+  }
+
   if (activeApp === 'finance') {
     return (
       <AppProvider>
@@ -39,6 +52,22 @@ function AppInner() {
 
   if (activeApp === 'agent') {
     return <AgentApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'corvees') {
+    return <CorveesApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'travaux') {
+    return <TravauxApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'shopping') {
+    return <ShoppingApp onHome={() => setActiveApp(null)} />;
+  }
+
+  if (activeApp === 'holiday') {
+    return <HolidayApp onHome={() => setActiveApp(null)} />;
   }
 
   return <PortalPage onSelectApp={setActiveApp} />;

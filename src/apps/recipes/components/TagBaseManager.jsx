@@ -2,30 +2,33 @@ import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
 
-import EmojiPicker from './EmojiPicker'
-
-// Emoji proposé par défaut à la création (les ingrédients n'en ont pas par défaut)
-const DEFAULT_ICONS = { tag: '🏷️', base: '🍚', ingredient: '' }
+// Common emoji picker options
+const EMOJI_OPTIONS = ['🏷️', '⚡', '👶', '🥬', '🌱', '🍖', '🐟', '🌶️', '❤️', '⭐', '🔥', '🧀', '🥗', '🍝', '🍜', '🥘', '🍰', '🎉']
+const CATEGORY_EMOJI_OPTIONS = ['🥬', '🍖', '🧀', '🍚', '🥫', '🍺', '❄️', '🧴', '🍞', '🥚', '🫒', '🧂', '🍫', '🐟', '🥜', '🧁', '🌿', '🛒']
 
 export default function TagBaseManager({ type, onClose }) {
-  const { 
+  const {
     t, getName, language,
-    tags, bases, ingredients, recipes, shoppingCategories,
+    tags, bases, ingredients, ingredientCategories, recipes,
     createTag, updateTag, deleteTag,
     createBase, updateBase, deleteBase,
+    createIngredientCategory, updateIngredientCategory, deleteIngredientCategory,
     createIngredient, updateIngredient, deleteIngredient
   } = useApp()
 
   const isTag = type === 'tag'
   const isBase = type === 'base'
   const isIngredient = type === 'ingredient'
+  const isCategory = type === 'ingredientCategory'
 
-  const items = isTag ? tags : isBase ? bases : ingredients
-  const title = isTag 
-    ? t('manage.tags.title') 
-    : isBase 
-      ? t('manage.bases.title') 
-      : t('manage.ingredients.title')
+  const items = isTag ? tags : isBase ? bases : isCategory ? ingredientCategories : ingredients
+  const title = isTag
+    ? t('manage.tags.title')
+    : isBase
+      ? t('manage.bases.title')
+      : isCategory
+        ? t('manage.ingredientCategories.title')
+        : t('manage.ingredients.title')
 
   const [editingItem, setEditingItem] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -34,21 +37,21 @@ export default function TagBaseManager({ type, onClose }) {
   // Form state
   const [nameFr, setNameFr] = useState('')
   const [nameEn, setNameEn] = useState('')
-  const [icon, setIcon] = useState(DEFAULT_ICONS[type])
+  const [icon, setIcon] = useState('🏷️')
   const [categoryId, setCategoryId] = useState('')
-
-  const categoryById = new Map(shoppingCategories.map(c => [c.id, c]))
 
   // Count recipes using an item
   const getUsageCount = (itemId) => {
     if (isTag) {
-      return recipes.filter(r => 
+      return recipes.filter(r =>
         r.recipe_tags?.some(rt => rt.tag_id === itemId)
       ).length
     } else if (isBase) {
       return recipes.filter(r => r.base_id === itemId).length
+    } else if (isCategory) {
+      return ingredients.filter(i => i.category_id === itemId).length
     } else {
-      return recipes.filter(r => 
+      return recipes.filter(r =>
         r.recipe_ingredients?.some(ri => ri.ingredient_id === itemId)
       ).length
     }
@@ -59,7 +62,7 @@ export default function TagBaseManager({ type, onClose }) {
     setEditingItem(null)
     setNameFr('')
     setNameEn('')
-    setIcon(DEFAULT_ICONS[type])
+    setIcon(isCategory ? '🥬' : '🏷️')
     setCategoryId('')
     setShowForm(true)
   }
@@ -69,8 +72,12 @@ export default function TagBaseManager({ type, onClose }) {
     setEditingItem(item)
     setNameFr(item.name_fr)
     setNameEn(item.name_en)
-    setIcon(item.icon ?? DEFAULT_ICONS[type])
-    setCategoryId(item.category_id || '')
+    if (isTag || isCategory) {
+      setIcon(item.icon || '🏷️')
+    }
+    if (isIngredient) {
+      setCategoryId(item.category_id || '')
+    }
     setShowForm(true)
   }
 
@@ -89,8 +96,7 @@ export default function TagBaseManager({ type, onClose }) {
       const data = {
         name_fr: nameFr.trim(),
         name_en: nameEn.trim(),
-        // La colonne icon des tags est NOT NULL : on retombe sur l'emoji par défaut
-        icon: icon || (isTag ? DEFAULT_ICONS.tag : null),
+        ...((isTag || isCategory) && { icon }),
         ...(isIngredient && { category_id: categoryId || null })
       }
 
@@ -99,6 +105,8 @@ export default function TagBaseManager({ type, onClose }) {
           await updateTag(editingItem.id, data)
         } else if (isBase) {
           await updateBase(editingItem.id, data)
+        } else if (isCategory) {
+          await updateIngredientCategory(editingItem.id, data)
         } else {
           await updateIngredient(editingItem.id, data)
         }
@@ -107,6 +115,8 @@ export default function TagBaseManager({ type, onClose }) {
           await createTag(data)
         } else if (isBase) {
           await createBase(data)
+        } else if (isCategory) {
+          await createIngredientCategory(data)
         } else {
           await createIngredient(data)
         }
@@ -123,7 +133,7 @@ export default function TagBaseManager({ type, onClose }) {
   const handleDelete = async (item) => {
     const usageCount = getUsageCount(item.id)
     const message = usageCount > 0
-      ? `${t('manage.deleteConfirm')} ${t('manage.inUse', { count: usageCount })}`
+      ? `${t('manage.deleteConfirm')} ${isCategory ? t('manage.inUseIngredients', { count: usageCount }) : t('manage.inUse', { count: usageCount })}`
       : t('manage.deleteConfirm')
 
     if (!window.confirm(message)) return
@@ -133,12 +143,21 @@ export default function TagBaseManager({ type, onClose }) {
         await deleteTag(item.id)
       } else if (isBase) {
         await deleteBase(item.id)
+      } else if (isCategory) {
+        await deleteIngredientCategory(item.id)
       } else {
         await deleteIngredient(item.id)
       }
     } catch (error) {
       console.error('Delete error:', error)
     }
+  }
+
+  // Get category name for an ingredient
+  const getCategoryLabel = (item) => {
+    if (!isIngredient || !item.category_id) return null
+    const cat = ingredientCategories.find(c => c.id === item.category_id)
+    return cat ? `${cat.icon || ''} ${getName(cat)}`.trim() : null
   }
 
   return (
@@ -158,20 +177,21 @@ export default function TagBaseManager({ type, onClose }) {
               <div style={styles.list}>
                 {items.map(item => {
                   const usageCount = getUsageCount(item.id)
+                  const catLabel = getCategoryLabel(item)
                   return (
                     <div key={item.id} style={styles.item}>
                       <div style={styles.itemInfo}>
-                        <span style={styles.itemIcon}>{item.icon || (isIngredient ? '🥕' : DEFAULT_ICONS[type])}</span>
-                        {isIngredient && categoryById.get(item.category_id) && (
-                          <span style={styles.categoryChip} title={getName(categoryById.get(item.category_id))}>
-                            {categoryById.get(item.category_id).icon}
-                          </span>
-                        )}
+                        {(isTag || isCategory) && <span style={styles.itemIcon}>{item.icon}</span>}
                         <div style={styles.itemNames}>
                           <span style={styles.itemName}>{getName(item)}</span>
+                          {catLabel && (
+                            <span style={styles.itemCategory}>{catLabel}</span>
+                          )}
                           {usageCount > 0 && (
                             <span style={styles.itemUsage}>
-                              {t('manage.inUse', { count: usageCount })}
+                              {isCategory
+                                ? t('manage.inUseIngredients', { count: usageCount })
+                                : t('manage.inUse', { count: usageCount })}
                             </span>
                           )}
                         </div>
@@ -204,11 +224,28 @@ export default function TagBaseManager({ type, onClose }) {
           {/* Form */}
           {showForm && (
             <div style={styles.form}>
-              {/* Icon picker */}
-              <div style={styles.field}>
-                <label style={commonStyles.label}>{t('manage.icon')}</label>
-                <EmojiPicker value={icon} onChange={setIcon} placeholder={t('manage.emojiPlaceholder')} />
-              </div>
+              {/* Icon picker (tags and categories) */}
+              {(isTag || isCategory) && (
+                <div style={styles.field}>
+                  <label style={commonStyles.label}>{t('manage.icon')}</label>
+                  <div style={styles.emojiPicker}>
+                    {(isCategory ? CATEGORY_EMOJI_OPTIONS : EMOJI_OPTIONS).map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setIcon(emoji)}
+                        style={{
+                          ...styles.emojiButton,
+                          backgroundColor: icon === emoji ? colors.forest + '18' : 'transparent',
+                          borderColor: icon === emoji ? colors.forest : 'transparent'
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Name FR */}
               <div style={styles.field}>
@@ -235,14 +272,20 @@ export default function TagBaseManager({ type, onClose }) {
                 />
               </div>
 
-              {/* Aisle (ingredients only) */}
-              {isIngredient && (
+              {/* Category picker (ingredients only) */}
+              {isIngredient && ingredientCategories.length > 0 && (
                 <div style={styles.field}>
                   <label style={commonStyles.label}>{t('manage.category')}</label>
-                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={styles.input}>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    style={styles.select}
+                  >
                     <option value="">{t('manage.category.none')}</option>
-                    {shoppingCategories.map(c => (
-                      <option key={c.id} value={c.id}>{c.icon} {getName(c)}</option>
+                    {ingredientCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {getName(cat)}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -276,189 +319,96 @@ export default function TagBaseManager({ type, onClose }) {
   )
 }
 
-// ============================================
-// STYLES
-// ============================================
-
 const styles = {
   overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    zIndex: 1000
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: spacing.md, zIndex: 1000
   },
 
   modal: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    width: '100%',
-    maxWidth: '440px',
-    maxHeight: '80vh',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: shadows.lg
+    backgroundColor: colors.white, borderRadius: '20px',
+    width: '100%', maxWidth: '400px', maxHeight: '80vh',
+    display: 'flex', flexDirection: 'column', boxShadow: shadows.lg
   },
 
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottom: `1px solid ${colors.warmGray}`
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}`
   },
 
   title: {
-    fontFamily: fonts.heading,
-    fontSize: fontSizes.xl,
-    color: colors.forest,
-    margin: 0
+    fontFamily: fonts.heading, fontSize: fontSizes.xl,
+    color: colors.forest, margin: 0, fontWeight: 700
   },
 
   closeButton: {
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: colors.warmGray,
-    borderRadius: borderRadius.full,
-    cursor: 'pointer',
-    fontSize: fontSizes.md,
-    color: colors.textSecondary
+    width: '34px', height: '34px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', backgroundColor: colors.background, borderRadius: '10px',
+    cursor: 'pointer', fontSize: fontSizes.md, color: colors.textSecondary,
+    transition: 'all 0.2s ease'
   },
 
-  content: {
-    padding: spacing.md,
-    overflowY: 'auto',
-    flex: 1
-  },
+  content: { padding: '16px 20px', overflowY: 'auto', flex: 1 },
 
   list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginBottom: spacing.md
+    display: 'flex', flexDirection: 'column',
+    gap: spacing.sm, marginBottom: spacing.md
   },
 
   item: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.cream,
-    borderRadius: borderRadius.md
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '10px 12px', backgroundColor: colors.background,
+    borderRadius: '12px'
   },
 
-  itemInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1
-  },
+  itemInfo: { display: 'flex', alignItems: 'center', gap: '10px', flex: 1 },
+  itemIcon: { fontSize: fontSizes.lg },
+  itemNames: { display: 'flex', flexDirection: 'column' },
+  itemName: { fontSize: fontSizes.md, color: colors.textPrimary, fontWeight: 500 },
+  itemCategory: { fontSize: fontSizes.xs, color: colors.forest, fontWeight: 500 },
+  itemUsage: { fontSize: fontSizes.xs, color: colors.textMuted },
 
-  itemIcon: {
-    fontSize: '22px'
-  },
-
-  categoryChip: {
-    fontSize: fontSizes.sm,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.full,
-    padding: '2px 6px'
-  },
-
-  itemNames: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-
-  itemName: {
-    fontSize: fontSizes.md,
-    color: colors.textPrimary,
-    fontWeight: 500
-  },
-
-  itemUsage: {
-    fontSize: fontSizes.xs,
-    color: colors.textMuted
-  },
-
-  itemActions: {
-    display: 'flex',
-    gap: spacing.xs
-  },
+  itemActions: { display: 'flex', gap: spacing.xs },
 
   editButton: {
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: fontSizes.sm,
-    borderRadius: borderRadius.md
+    width: '34px', height: '34px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
+    fontSize: fontSizes.sm, borderRadius: '10px', transition: 'all 0.2s ease'
   },
 
   deleteButton: {
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: fontSizes.sm,
-    borderRadius: borderRadius.md
+    width: '34px', height: '34px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
+    fontSize: fontSizes.sm, borderRadius: '10px', transition: 'all 0.2s ease'
   },
 
-  addButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonPrimary,
-    width: '100%'
+  addButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary, width: '100%' },
+
+  form: { display: 'flex', flexDirection: 'column', gap: spacing.md },
+  field: { display: 'flex', flexDirection: 'column' },
+  input: { ...commonStyles.input, padding: '10px 14px' },
+  select: {
+    ...commonStyles.input, padding: '10px 14px',
+    appearance: 'auto', cursor: 'pointer'
   },
 
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.md
+  emojiPicker: { display: 'flex', flexWrap: 'wrap', gap: spacing.xs },
+
+  emojiButton: {
+    width: '42px', height: '42px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '2px solid transparent', borderRadius: '10px',
+    cursor: 'pointer', fontSize: fontSizes.lg, backgroundColor: 'transparent',
+    transition: 'all 0.2s ease'
   },
 
-  field: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-
-  input: {
-    ...commonStyles.input,
-    padding: spacing.sm
-  },
-
-  formActions: {
-    display: 'flex',
-    gap: spacing.sm,
-    marginTop: spacing.sm
-  },
-
-  cancelButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonSecondary,
-    flex: 1
-  },
-
-  saveButton: {
-    ...commonStyles.buttonBase,
-    ...commonStyles.buttonPrimary,
-    flex: 1
-  }
+  formActions: { display: 'flex', gap: spacing.sm, marginTop: spacing.sm },
+  cancelButton: { ...commonStyles.buttonBase, ...commonStyles.buttonSecondary, flex: 1 },
+  saveButton: { ...commonStyles.buttonBase, ...commonStyles.buttonPrimary, flex: 1 }
 }
