@@ -3,7 +3,7 @@ import RecipesPage from './RecipesPage'
 import CalendarPage from './CalendarPage'
 import ShoppingListPage from './ShoppingListPage'
 import SettingsPage from './SettingsPage'
-import { colors, shadows } from '../lib/theme'
+import { colors, primaryRgb } from '../lib/theme'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
@@ -54,7 +54,9 @@ export default function Layout({ onHome }) {
       </header>
 
       <main style={styles.main}>
-        {renderPage()}
+        <div key={currentTab} className="rc-page">
+          {renderPage()}
+        </div>
       </main>
 
       <nav style={styles.nav}>
@@ -91,7 +93,7 @@ const styles = {
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '10px 16px',
-    backgroundColor: 'rgba(255,255,255,0.82)',
+    backgroundColor: 'rgba(255,255,255,0.78)',
     backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
     borderBottom: `1px solid ${colors.warmGray}`,
     position: 'sticky', top: 0, zIndex: 200,
@@ -105,7 +107,12 @@ const styles = {
     background: 'white', fontSize: '16px', cursor: 'pointer', padding: 0,
     transition: 'all 0.2s ease'
   },
-  logoText: { fontSize: '20px', fontWeight: 800, color: colors.textPrimary, fontFamily: FONT, letterSpacing: '-0.3px' },
+  logoText: {
+    fontSize: '21px', fontWeight: 800, fontFamily: FONT, letterSpacing: '-0.4px',
+    backgroundImage: `linear-gradient(135deg, ${colors.forest}, ${colors.terracotta})`,
+    WebkitBackgroundClip: 'text', backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent', color: colors.forest
+  },
   actions: { display: 'flex', alignItems: 'center', gap: '6px' },
   langBtn: {
     padding: '6px 14px', border: `1.5px solid ${colors.warmGray}`, borderRadius: '10px',
@@ -135,7 +142,7 @@ const styles = {
     backgroundColor: 'rgba(255,255,255,0.88)',
     backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
     borderRadius: '20px',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)',
+    boxShadow: `0 8px 28px rgba(${primaryRgb},0.14), 0 0 0 1px rgba(${primaryRgb},0.06)`,
     padding: '6px 4px',
   },
   tab: {
@@ -144,7 +151,7 @@ const styles = {
     border: 'none', backgroundColor: 'transparent', cursor: 'pointer',
     borderRadius: '14px', transition: 'all 0.25s ease'
   },
-  tabActive: { backgroundColor: colors.forest + '0F' },
+  tabActive: { backgroundColor: colors.forest + '1A' },
   icon: { fontSize: '20px', position: 'relative', transition: 'all 0.25s ease' },
   badge: {
     position: 'absolute', top: '-5px', right: '-10px',

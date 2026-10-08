@@ -1,16 +1,21 @@
 const systemFont = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
+// Palette « indigo » : `forest` reste le nom de la couleur principale (utilisé partout),
+// mais sa valeur est désormais indigo. Les neutres sont légèrement teintés de violet.
 export const colors = {
-  forest: '#1B6B3A', forestLight: '#28894D', forestDark: '#145A2E',
-  terracotta: '#C17A5E', terracottaLight: '#D4917A',
-  gold: '#C9982E', goldLight: '#E5C17A',
-  cream: '#F8FAFB', warmGray: '#E8ECF0', warmGrayDark: '#CDD4DA',
-  textPrimary: '#1A1D1F', textSecondary: '#6F767E', textMuted: '#9A9FA5',
-  white: '#FFFFFF', error: '#D44333', errorLight: '#FFF4F2',
-  success: '#1B6B3A', successLight: '#EEFBF3',
-  accent: '#2A85FF', accentLight: '#F0F7FF',
-  background: '#F4F5F6',
+  forest: '#5B5BD6', forestLight: '#7C7CEB', forestDark: '#4343B5',
+  terracotta: '#F2766B', terracottaLight: '#F7978E',
+  gold: '#F5A524', goldLight: '#FFC857',
+  cream: '#F6F6FC', warmGray: '#E8E8F3', warmGrayDark: '#CFCFE2',
+  textPrimary: '#1C1B2E', textSecondary: '#64647C', textMuted: '#9696AE',
+  white: '#FFFFFF', error: '#E5484D', errorLight: '#FFF1F1',
+  success: '#12A150', successLight: '#E8F8EF',
+  accent: '#3B82F6', accentLight: '#EEF4FF',
+  background: '#F3F3FA',
 }
+
+// Couleur principale en RGB, pour les ombres colorées
+export const primaryRgb = '91,91,214'
 
 export const fonts = {
   body: systemFont,
@@ -45,7 +50,12 @@ export const commonStyles = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
     transition: 'all 0.2s ease'
   },
-  buttonPrimary: { backgroundColor: colors.forest, color: colors.white },
+  buttonPrimary: {
+    backgroundColor: colors.forest,
+    backgroundImage: `linear-gradient(135deg, ${colors.forestLight}, ${colors.forest})`,
+    color: colors.white,
+    boxShadow: `0 4px 12px rgba(${primaryRgb},0.28)`
+  },
   buttonSecondary: { backgroundColor: colors.background, color: colors.textPrimary },
   buttonDanger: { backgroundColor: colors.error, color: colors.white },
   input: {
@@ -63,11 +73,11 @@ export const commonStyles = {
 }
 
 export function getSeasonColor(season) {
-  const seasonColors = { winter: '#5B8DD9', spring: '#7BC47F', summer: '#F4D03F', autumn: '#E67E22' }
+  const seasonColors = { winter: '#5B9DF0', spring: '#34C98B', summer: '#F5B82E', autumn: '#F2803D' }
   return seasonColors[season] || colors.warmGray
 }
 
 export function getDifficultyColor(difficulty) {
-  const difficultyColors = { easy: '#00B894', medium: colors.gold, hard: colors.terracotta }
+  const difficultyColors = { easy: '#12B886', medium: colors.gold, hard: colors.terracotta }
   return difficultyColors[difficulty] || colors.textMuted
 }
