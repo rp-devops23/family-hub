@@ -1,0 +1,74 @@
+/* Animations et finitions de l'app Recettes (limitées à .recipes-app) */
+
+.recipes-app {
+  --rc-primary: #5B5BD6;
+  --rc-primary-rgb: 91, 91, 214;
+  --rc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Retour tactile : les boutons s'enfoncent légèrement */
+.recipes-app button {
+  transition: transform 0.18s var(--rc-ease), background-color 0.2s ease,
+              border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+.recipes-app button:active:not(:disabled) { transform: scale(0.96); }
+.recipes-app button:disabled { cursor: not-allowed; }
+
+@media (hover: hover) {
+  .recipes-app button:hover:not(:disabled) { filter: brightness(0.97); }
+}
+
+/* Focus clavier visible et champs mis en valeur */
+.recipes-app button:focus-visible,
+.recipes-app a:focus-visible {
+  outline: 3px solid rgba(var(--rc-primary-rgb), 0.35);
+  outline-offset: 2px;
+}
+.recipes-app input,
+.recipes-app select,
+.recipes-app textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.recipes-app input:focus,
+.recipes-app select:focus,
+.recipes-app textarea:focus {
+  border-color: var(--rc-primary);
+  box-shadow: 0 0 0 4px rgba(var(--rc-primary-rgb), 0.14);
+}
+
+/* Changement d'onglet : apparition douce */
+@keyframes rc-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.recipes-app .rc-page { animation: rc-page-in 0.35s var(--rc-ease) both; }
+
+/* Modales : fond en fondu, contenu qui « pop » (ou monte, pour les feuilles du bas) */
+@keyframes rc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rc-pop-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes rc-sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+.recipes-app [style*="z-index: 1000"] { animation: rc-fade-in 0.2s ease both; }
+.recipes-app [style*="z-index: 1000"] > div { animation: rc-pop-in 0.3s var(--rc-ease) both; }
+.recipes-app [style*="z-index: 1000"][style*="align-items: flex-end"] > div {
+  animation: rc-sheet-in 0.35s var(--rc-ease) both;
+}
+
+/* Barres de défilement discrètes */
+.recipes-app ::-webkit-scrollbar { width: 8px; height: 8px; }
+.recipes-app ::-webkit-scrollbar-thumb { background: #CFCFE2; border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .recipes-app *, .recipes-app *::before, .recipes-app *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

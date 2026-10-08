@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, shadows } from '../lib/theme'
+import { colors, fonts, shadows, primaryRgb } from '../lib/theme'
 import RecipeCard from './RecipeCard'
 import RecipeForm from './RecipeForm'
 import FilterPanel from './FilterPanel'
@@ -117,8 +117,9 @@ const styles = {
   fab: {
     position: 'fixed', bottom: '100px', right: 'max(20px, calc(50% - 280px))',
     width: '56px', height: '56px', borderRadius: '18px',
-    backgroundColor: colors.forest, color: 'white', border: 'none',
-    boxShadow: '0 4px 16px rgba(27,107,58,0.35)', cursor: 'pointer',
+    backgroundColor: colors.forest, backgroundImage: `linear-gradient(135deg, ${colors.forestLight}, ${colors.forest})`,
+    color: 'white', border: 'none',
+    boxShadow: `0 8px 20px rgba(${primaryRgb},0.38)`, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '28px', fontWeight: '300', fontFamily: fonts.body,
     transition: 'all 0.25s ease'
