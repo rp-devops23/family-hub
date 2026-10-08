@@ -78,3 +78,34 @@ export function pushRecentApp(id) {
     localStorage.setItem(RECENT_KEY, JSON.stringify(next));
   } catch { /* stockage indisponible : on ignore */ }
 }
+
+// --- Préférences d'accueil (par appareil) : apps masquées et ouverture directe ---
+const PREFS_KEY = 'familyhub.homePrefs';
+// Les apps encore peu utilisées sont masquées au départ ; elles se réactivent via « Personnaliser »
+const DEFAULT_HIDDEN = ['corvees', 'travaux', 'holiday'];
+
+export function getHomePrefs() {
+  const defaults = { hidden: DEFAULT_HIDDEN, openLast: false };
+  try {
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return defaults;
+    return {
+      hidden: Array.isArray(raw.hidden) ? raw.hidden.filter(isAppId) : defaults.hidden,
+      openLast: raw.openLast === true,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+export function saveHomePrefs(prefs) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch { /* stockage indisponible : on ignore */ }
+}
+
+// Dernière app ouverte et encore visible (pour l'ouverture directe)
+export function getLastVisibleApp() {
+  const { hidden } = getHomePrefs();
+  return getRecentApps().find(id => !hidden.includes(id)) || null;
+}

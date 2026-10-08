@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { APPS, ASSISTANT, GROUPS, getApp, getRecentApps } from './apps';
+import { APPS, ASSISTANT, GROUPS, getApp, getRecentApps, getHomePrefs, saveHomePrefs } from './apps';
 
 // ============================================================================
 // PORTAL PAGE - Family hub home screen
@@ -38,10 +38,34 @@ function greeting(t) {
   return t('Bonsoir', 'Good evening');
 }
 
+function Switch({ on, onChange, label }) {
+  return (
+    <button
+      type="button" role="switch" aria-checked={on} aria-label={label} onClick={onChange}
+      style={{ ...styles.switchTrack, backgroundColor: on ? '#5B5BD6' : '#CFCFE2' }}
+    >
+      <span style={{ ...styles.switchThumb, transform: on ? 'translateX(20px)' : 'none' }} />
+    </button>
+  );
+}
+
 export default function PortalPage({ onSelectApp }) {
   const { signOut, language, toggleLanguage, t } = useAuth();
 
-  const recents = useMemo(() => getRecentApps().map(getApp).filter(Boolean), []);
+  const [prefs, setPrefs] = useState(getHomePrefs);
+  const [editing, setEditing] = useState(false);
+
+  const updatePrefs = (next) => { setPrefs(next); saveHomePrefs(next); };
+  const toggleApp = (id) => updatePrefs({
+    ...prefs,
+    hidden: prefs.hidden.includes(id) ? prefs.hidden.filter(x => x !== id) : [...prefs.hidden, id],
+  });
+
+  const isVisible = (app) => !prefs.hidden.includes(app.id);
+  const recents = useMemo(
+    () => getRecentApps().map(getApp).filter(app => app && !prefs.hidden.includes(app.id)),
+    [prefs.hidden]
+  );
   const title = (app) => (language === 'fr' ? app.titleFr : app.titleEn);
   const desc = (app) => (language === 'fr' ? app.descFr : app.descEn);
 
@@ -69,6 +93,35 @@ export default function PortalPage({ onSelectApp }) {
           </div>
         </header>
 
+        {editing ? (
+          <section className="p-in" style={styles.section}>
+            <h2 style={styles.sectionTitle}>{t('Applications affichées', 'Visible apps')}</h2>
+            <div style={styles.list}>
+              {APPS.map(app => (
+                <div key={app.id} style={styles.editRow}>
+                  <span style={{ ...styles.editIcon, backgroundColor: app.bg }}>{app.icon}</span>
+                  <span style={styles.cardText}>
+                    <span style={styles.cardTitle}>{title(app)}</span>
+                  </span>
+                  <Switch on={isVisible(app)} onChange={() => toggleApp(app.id)} label={title(app)} />
+                </div>
+              ))}
+            </div>
+
+            <h2 style={{ ...styles.sectionTitle, marginTop: '22px' }}>{t('Démarrage', 'Startup')}</h2>
+            <div style={styles.editRow}>
+              <span style={{ ...styles.editIcon, backgroundColor: '#EEEEFC' }}>⚡</span>
+              <span style={styles.cardText}>
+                <span style={styles.cardTitle}>{t('Ouvrir ma dernière app', 'Open my last app')}</span>
+                <span style={styles.cardDesc}>{t("Saute l'accueil au lancement. Le bouton 🏠 y ramène.", 'Skips the home on launch. The 🏠 button brings you back.')}</span>
+              </span>
+              <Switch on={prefs.openLast} onChange={() => updatePrefs({ ...prefs, openLast: !prefs.openLast })} label={t('Ouvrir ma dernière app', 'Open my last app')} />
+            </div>
+
+            <button onClick={() => setEditing(false)} style={styles.doneBtn}>{t('Terminé', 'Done')}</button>
+          </section>
+        ) : (
+          <>
         {/* Assistant en vedette */}
         <button className="p-in p-card" onClick={() => onSelectApp(ASSISTANT.id)} style={styles.hero}>
           <span style={styles.heroIcon}>{ASSISTANT.icon}</span>
@@ -96,7 +149,7 @@ export default function PortalPage({ onSelectApp }) {
 
         {/* Applications par domaine */}
         {GROUPS.map((group, gi) => {
-          const apps = APPS.filter(a => a.group === group.id);
+          const apps = APPS.filter(a => a.group === group.id && isVisible(a));
           if (apps.length === 0) return null;
           return (
             <section key={group.id} className="p-in" style={{ ...styles.section, animationDelay: `${120 + gi * 60}ms` }}>
@@ -116,6 +169,13 @@ export default function PortalPage({ onSelectApp }) {
             </section>
           );
         })}
+
+
+            <button onClick={() => setEditing(true)} style={styles.customizeBtn}>
+              ⚙️ {t("Personnaliser l'accueil", 'Customize home')}
+            </button>
+          </>
+        )}
 
         <p style={styles.footer}>🏠 Family Hub</p>
       </div>
@@ -184,6 +244,24 @@ const styles = {
   cardTitle: { fontSize: '16px', fontWeight: 700, color: INK },
   cardDesc: { fontSize: '13px', color: MUTED, lineHeight: 1.35 },
   chevron: { fontSize: '26px', fontWeight: 300, lineHeight: 1, flexShrink: 0 },
+
+  editRow: {
+    display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 14px', background: 'white',
+    borderRadius: '18px', border: '1px solid rgba(91,91,214,.06)',
+    boxShadow: '0 1px 2px rgba(28,27,46,.04)',
+  },
+  editIcon: { width: '44px', height: '44px', flexShrink: 0, borderRadius: '13px', fontSize: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  switchTrack: { width: '48px', height: '28px', flexShrink: 0, border: 'none', borderRadius: '14px', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
+  switchThumb: { width: '24px', height: '24px', borderRadius: '12px', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,.25)', transition: 'transform .2s cubic-bezier(.22,1,.36,1)' },
+  doneBtn: {
+    width: '100%', marginTop: '18px', padding: '14px', border: 'none', borderRadius: '16px', cursor: 'pointer',
+    color: 'white', fontSize: '16px', fontWeight: 700, backgroundImage: 'linear-gradient(135deg, #7C7CEB, #5B5BD6)',
+    boxShadow: '0 6px 18px rgba(91,91,214,.3)',
+  },
+  customizeBtn: {
+    display: 'block', margin: '28px auto 0', padding: '10px 18px', border: `1.5px dashed ${LINE}`,
+    borderRadius: '14px', background: 'transparent', color: MUTED, fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+  },
 
   footer: { textAlign: 'center', color: '#B0B0C4', fontSize: '12px', margin: '32px 0 0' },
 };
