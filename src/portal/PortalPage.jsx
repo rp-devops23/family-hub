@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { APPS, ASSISTANT, GROUPS, getApp, getRecentApps, getHomePrefs, saveHomePrefs } from './apps';
 
@@ -50,10 +51,25 @@ function Switch({ on, onChange, label }) {
 }
 
 export default function PortalPage({ onSelectApp }) {
-  const { signOut, language, toggleLanguage, t } = useAuth();
+  const { user, signOut, language, toggleLanguage, t } = useAuth();
 
   const [prefs, setPrefs] = useState(getHomePrefs);
   const [editing, setEditing] = useState(false);
+  const [toBuy, setToBuy] = useState(null); // nombre d'articles non cochés (null = inconnu)
+
+  // Compteur de la liste de courses ; en cas d'erreur, le bouton reste utilisable sans compteur
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+    supabase
+      .from('shopping_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('checked', false)
+      .then(({ count, error }) => { if (!cancelled && !error) setToBuy(count ?? 0); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const updatePrefs = (next) => { setPrefs(next); saveHomePrefs(next); };
   const toggleApp = (id) => updatePrefs({
@@ -131,6 +147,28 @@ export default function PortalPage({ onSelectApp }) {
           </span>
           <span style={styles.heroArrow} aria-hidden="true">→</span>
         </button>
+
+        {/* Accès rapide : liste de courses */}
+        {!editing && (
+          <button
+            className="p-in p-card" onClick={() => onSelectApp('recipes', 'shopping')}
+            style={{ ...styles.quick, animationDelay: '30ms' }}
+          >
+            <span style={styles.quickIcon}>🛒</span>
+            <span style={styles.cardText}>
+              <span style={styles.cardTitle}>{t('Liste de courses', 'Shopping list')}</span>
+              <span style={styles.cardDesc}>
+                {toBuy > 0
+                  ? t(`${toBuy} article${toBuy > 1 ? 's' : ''} à acheter`, `${toBuy} item${toBuy > 1 ? 's' : ''} to buy`)
+                  : toBuy === 0
+                    ? t('Rien à acheter pour le moment', 'Nothing to buy right now')
+                    : t('Ajouter ou cocher des articles', 'Add or check off items')}
+              </span>
+            </span>
+            {toBuy > 0 && <span style={styles.quickBadge}>{toBuy > 99 ? '99+' : toBuy}</span>}
+            <span style={{ ...styles.chevron, color: '#5B5BD6' }} aria-hidden="true">›</span>
+          </button>
+        )}
 
         {/* Reprise rapide */}
         {recents.length > 0 && (
@@ -245,6 +283,17 @@ const styles = {
   cardDesc: { fontSize: '13px', color: MUTED, lineHeight: 1.35 },
   chevron: { fontSize: '26px', fontWeight: 300, lineHeight: 1, flexShrink: 0 },
 
+  quick: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 14px', marginTop: '12px',
+    border: '1.5px solid rgba(91,91,214,.22)', borderRadius: '18px', background: 'white',
+    boxShadow: '0 4px 14px rgba(91,91,214,.1)', cursor: 'pointer', textAlign: 'left',
+  },
+  quickIcon: { width: '44px', height: '44px', flexShrink: 0, borderRadius: '14px', fontSize: '22px', backgroundColor: '#EEEEFC', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  quickBadge: {
+    minWidth: '28px', height: '28px', padding: '0 9px', borderRadius: '14px', flexShrink: 0,
+    backgroundImage: 'linear-gradient(135deg, #7C7CEB, #5B5BD6)', color: 'white',
+    fontSize: '14px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
   editRow: {
     display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 14px', background: 'white',
     borderRadius: '18px', border: '1px solid rgba(91,91,214,.06)',
