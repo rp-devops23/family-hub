@@ -16,29 +16,33 @@ import './App.css';
 
 // L'application ouverte est reflétée dans l'URL (#/recettes…) : le bouton retour du
 // téléphone ramène à l'accueil au lieu de quitter, et un rechargement garde l'app.
-function appFromHash() {
-  const id = window.location.hash.replace(/^#\/?/, '');
-  return isAppId(id) ? id : null;
+// Forme : #/<app> ou #/<app>/<onglet> (ex. #/recipes/shopping pour la liste de courses)
+function routeFromHash() {
+  const [id, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
+  return isAppId(id) ? { app: id, tab: tab || null } : { app: null, tab: null };
 }
 
 function AppInner() {
   const { user, authLoading } = useAuth();
   // Au démarrage : l'app de l'URL, sinon (si activé dans « Personnaliser ») la dernière app ouverte.
   // Le bouton 🏠 ramène toujours à l'accueil.
-  const [activeApp, setActiveApp] = useState(
-    () => appFromHash() ?? (getHomePrefs().openLast ? getLastVisibleApp() : null)
-  );
+  const [route, setRoute] = useState(() => {
+    const fromHash = routeFromHash();
+    if (fromHash.app) return fromHash;
+    return { app: getHomePrefs().openLast ? getLastVisibleApp() : null, tab: null };
+  });
+  const activeApp = route.app;
 
   useEffect(() => {
-    const onPop = () => setActiveApp(appFromHash());
+    const onPop = () => setRoute(routeFromHash());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const openApp = (id) => {
+  const openApp = (id, tab = null) => {
     pushRecentApp(id);
-    window.history.pushState({ app: id }, '', `#/${id}`);
-    setActiveApp(id);
+    window.history.pushState({ app: id }, '', `#/${id}${tab ? `/${tab}` : ''}`);
+    setRoute({ app: id, tab });
   };
 
   const goHome = () => {
@@ -46,7 +50,7 @@ function AppInner() {
       window.history.back(); // dépile l'entrée ajoutée par openApp
     } else {
       window.history.replaceState(null, '', window.location.pathname);
-      setActiveApp(null);
+      setRoute({ app: null, tab: null });
     }
   };
 
@@ -80,7 +84,7 @@ function AppInner() {
   }
 
   if (activeApp === 'recipes') {
-    return <RecipeApp onHome={goHome} />;
+    return <RecipeApp onHome={goHome} initialTab={route.tab} />;
   }
 
   if (activeApp === 'agent') {

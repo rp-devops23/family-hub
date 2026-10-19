@@ -23,7 +23,9 @@ export function useApp() {
   return context
 }
 
-export function RecipeProvider({ children }) {
+const TABS = ['recipes', 'calendar', 'shopping', 'settings']
+
+export function RecipeProvider({ children, initialTab }) {
   const auth = useAuth()
   const { user } = auth
 
@@ -37,7 +39,7 @@ export function RecipeProvider({ children }) {
   const [mealPlans, setMealPlans] = useState([])
   const [shoppingItems, setShoppingItems] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
-  const [currentTab, setCurrentTab] = useState('recipes')
+  const [currentTab, setCurrentTab] = useState(TABS.includes(initialTab) ? initialTab : 'recipes')
 
   // Language & i18n from shared AuthContext
   const language = auth.language
