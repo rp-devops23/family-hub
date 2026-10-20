@@ -397,3 +397,20 @@ Deno.test('routage de modèle', () => {
   assert.equal(needsSonnet('Ajoute du lait'), true)
   assert.equal(needsSonnet('Planifie les lasagnes'), true)
 })
+
+Deno.test('journal indisponible (migration absente) : l’écriture est annulée, le modèle reçoit une erreur claire', async () => {
+  const { db } = setup()
+  db.failNext = { table: 'agent_actions', op: 'insert' } // simule la table agent_actions manquante
+  const before = db.rows('shopping_items').length
+  const model = scriptedModel([
+    toolUse(['add_shopping_items', { items: [{ name: 'Beurre' }] }]),
+    text('Je ne peux pas le faire pour le moment : le journal des actions est indisponible.'),
+  ])
+  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: model.fn }, { message: 'Ajoute du beurre à ma liste' })
+  assert.equal(db.rows('shopping_items').length, before, 'aucune écriture ne doit rester sans possibilité d’annuler')
+  const result = model.calls[1].messages.at(-1).content[0]
+  assert.equal(result.is_error, true)
+  assert.match(result.content, /action_log_unavailable/)
+  assert.equal(res.actions.length, 0)
+  assert.match(res.message, /indisponible/)
+})
