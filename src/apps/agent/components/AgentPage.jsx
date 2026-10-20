@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../../../context/AuthContext'
 import { supabase } from '../../../lib/supabase'
 import GoogleConnectPage from './GoogleConnectPage'
+import RichText from './RichText'
+import ActionCard from './ActionCard'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
@@ -29,6 +31,8 @@ export default function AgentPage({ onHome }) {
   const [googleConnected,  setGoogleConnected]  = useState(false)
   const [isListening,      setIsListening]      = useState(false)
   const [actionBanner,     setActionBanner]     = useState(null) // { text, success }
+  const [actions,          setActions]          = useState([])   // actions de la conversation (cartes)
+  const [busyActions,      setBusyActions]      = useState(() => new Set())
 
   const messagesEndRef  = useRef(null)
   const inputRef        = useRef(null)
@@ -47,7 +51,7 @@ export default function AgentPage({ onHome }) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages, actions, loading])
 
   // Auto-hide action banner
   useEffect(() => {
@@ -69,10 +73,44 @@ export default function AgentPage({ onHome }) {
   }
 
   async function loadMessages(convId) {
-    const { data } = await supabase
-      .from('agent_messages').select('id, role, content, created_at')
-      .eq('conversation_id', convId).order('created_at', { ascending: true })
+    const [{ data }, { data: actionRows }] = await Promise.all([
+      supabase.from('agent_messages').select('id, role, content, created_at')
+        .eq('conversation_id', convId).order('created_at', { ascending: true }),
+      // Tolérant : tant que la migration agent_actions n'est pas appliquée, pas de cartes
+      supabase.from('agent_actions').select('*')
+        .eq('conversation_id', convId).order('created_at', { ascending: true }),
+    ])
     setMessages(data ?? [])
+    setActions(actionRows ?? [])
+  }
+
+  // ---- Boutons des cartes : confirmer / refuser / annuler -------------------
+
+  async function runAction(kind, action) {
+    if (busyActions.has(action.id)) return
+    setBusyActions(prev => new Set(prev).add(action.id))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const { data, error: fnError } = await supabase.functions.invoke('family-agent', {
+        body: { action: kind, actionId: action.id, language },
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      })
+      if (fnError) throw new Error(fnError.message)
+      if (data?.error) throw new Error(data.error)
+      setActions(prev => prev.map(a => (a.id === action.id ? data.action : a)))
+      const messagesByKind = {
+        confirm: t('✅ Enregistré', '✅ Saved'),
+        cancel: t('Proposition refusée', 'Proposal declined'),
+        undo: t('↩️ Action annulée', '↩️ Action undone'),
+      }
+      setActionBanner({ success: data.action.status !== 'failed', text: messagesByKind[kind] })
+    } catch (err) {
+      console.error('Action error:', err)
+      setActionBanner({ success: false, text: `${t('Échec', 'Failed')} : ${err.message}` })
+      if (activeConvId) loadMessages(activeConvId) // resynchronise l'état des cartes
+    } finally {
+      setBusyActions(prev => { const next = new Set(prev); next.delete(action.id); return next })
+    }
   }
 
   // ---- Voice input ----------------------------------------------------------
@@ -126,7 +164,7 @@ export default function AgentPage({ onHome }) {
       const authHeader = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
 
       const { data, error: fnError } = await supabase.functions.invoke('family-agent', {
-        body: { message: text, conversationId: activeConvId },
+        body: { message: text, conversationId: activeConvId, language },
         headers: authHeader,
       })
       if (fnError) throw new Error(fnError.message)
@@ -138,21 +176,6 @@ export default function AgentPage({ onHome }) {
       }
 
       await loadMessages(data?.conversationId ?? activeConvId)
-
-      // Show action banner if a tool was executed
-      if (data?.actionPerformed) {
-        const { result, tool } = data.actionPerformed
-        if (result?.success) {
-          setActionBanner({
-            success: true,
-            text: tool === 'create_transaction'
-              ? t('✅ Transaction ajoutée', '✅ Transaction added')
-              : t('✅ Action effectuée', '✅ Action performed'),
-          })
-        } else {
-          setActionBanner({ success: false, text: t('⚠️ Échec de l\'action', '⚠️ Action failed') })
-        }
-      }
 
     } catch (err) {
       console.error('Agent error:', err)
@@ -194,10 +217,11 @@ export default function AgentPage({ onHome }) {
   // ---- Suggestions ----------------------------------------------------------
 
   const SUGGESTIONS = [
+    t("Ajoute du lait et des œufs à ma liste de courses", "Add milk and eggs to my shopping list"),
+    t("Qu'est-ce qu'on mange cette semaine ?", "What are we eating this week?"),
     t("J'ai dépensé 45€ au restaurant hier soir", "I spent €45 at a restaurant last night"),
-    t("Ajoute un revenu de 2500€ : salaire de mai", "Add €2500 income: May salary"),
-    t("Résume mes dépenses ce mois", "Summarize my spending this month"),
-    t("Quels sont mes budgets actifs ?", "What are my active budgets?"),
+    t("Combien j'ai dépensé en courses ce mois-ci ?", "How much did I spend on groceries this month?"),
+    t("Quelles tâches sont en retard ?", "Which tasks are overdue?"),
   ]
 
   if (showGoogleConnect) {
@@ -255,9 +279,9 @@ export default function AgentPage({ onHome }) {
         {actionBanner && (
           <div style={{
             ...styles.actionBanner,
-            backgroundColor: actionBanner.success ? '#F0FFF4' : '#FFF3F3',
-            borderColor: actionBanner.success ? '#68D391' : '#FFBCBC',
-            color: actionBanner.success ? '#2D5A3D' : '#C0392B',
+            backgroundColor: actionBanner.success ? '#EEF9F1' : '#FFF3F3',
+            borderColor: actionBanner.success ? '#9ADBB0' : '#FFBCBC',
+            color: actionBanner.success ? '#12804A' : '#C0392B',
           }}>
             {actionBanner.text}
           </div>
@@ -271,8 +295,8 @@ export default function AgentPage({ onHome }) {
               <p style={styles.emptyTitle}>Family Agent</p>
               <p style={styles.emptySubtitle}>
                 {t(
-                  'Parlez-moi d\'une dépense, d\'un revenu, ou posez-moi n\'importe quelle question sur votre famille.',
-                  'Tell me about an expense, income, or ask me anything about your family.',
+                  'Je peux remplir votre liste de courses, planifier des repas, gérer vos tâches et suivre vos dépenses. Tout ce que je change reste annulable.',
+                  'I can fill your shopping list, plan meals, manage tasks and track spending. Everything I change can be undone.',
                 )}
               </p>
               <div style={styles.suggestions}>
@@ -285,19 +309,34 @@ export default function AgentPage({ onHome }) {
             </div>
           )}
 
-          {messages.map(msg => (
-            <div key={msg.id} style={{ ...styles.msgRow, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              {msg.role === 'assistant' && <span style={styles.avatar}>🤖</span>}
-              <div style={{
-                ...styles.bubble,
-                ...(msg.role === 'user' ? styles.bubbleUser : styles.bubbleAgent),
-                ...(msg.error ? styles.bubbleError : {}),
-              }}>
-                <p style={styles.bubbleText}>{msg.content}</p>
-                <span style={styles.bubbleTime}>{formatTime(msg.created_at)}</span>
+          {messages.map(msg => {
+            const msgActions = actions.filter(a => a.message_id === msg.id)
+            return (
+              <div key={msg.id} style={{ ...styles.msgRow, justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                {msg.role === 'assistant' && <span style={styles.avatar}>🤖</span>}
+                <div style={styles.msgCol}>
+                  <div style={{
+                    ...styles.bubble,
+                    ...(msg.role === 'user' ? styles.bubbleUser : styles.bubbleAgent),
+                    ...(msg.error ? styles.bubbleError : {}),
+                  }}>
+                    {msg.role === 'assistant' && !msg.error
+                      ? <RichText text={msg.content} style={styles.bubbleText} />
+                      : <p style={styles.bubbleText}>{msg.content}</p>}
+                    <span style={styles.bubbleTime}>{formatTime(msg.created_at)}</span>
+                  </div>
+                  {msgActions.map(action => (
+                    <ActionCard
+                      key={action.id} action={action} t={t} busy={busyActions.has(action.id)}
+                      onConfirm={a => runAction('confirm', a)}
+                      onCancel={a => runAction('cancel', a)}
+                      onUndo={a => runAction('undo', a)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {loading && (
             <div style={{ ...styles.msgRow, justifyContent: 'flex-start' }}>
@@ -393,14 +432,14 @@ const styles = {
   headerTitle: { fontSize: '18px', fontWeight: 700, color: '#2D3436' },
   convBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' },
   iconBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px', border: '1px solid #E1E8ED', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT },
-  newChatBtn: { padding: '6px 12px', border: '1px solid #E1E8ED', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT, fontWeight: 600, color: '#00A3E0' },
-  googleBtnConnected: { backgroundColor: '#F0FFF4', borderColor: '#68D391', color: '#2D5A3D' },
+  newChatBtn: { padding: '6px 12px', border: '1px solid #E1E8ED', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT, fontWeight: 600, color: '#5B5BD6' },
+  googleBtnConnected: { backgroundColor: '#EEF9F1', borderColor: '#9ADBB0', color: '#12804A' },
 
   // Conversation list
   convList: { position: 'absolute', top: '57px', left: 0, right: 0, zIndex: 300, backgroundColor: 'white', borderBottom: '1px solid #E1E8ED', boxShadow: '0 4px 16px rgba(0,0,0,0.08)', maxHeight: '280px', overflowY: 'auto' },
-  newConvItem: { width: '100%', padding: '14px 16px', textAlign: 'left', border: 'none', borderBottom: '1px solid #F0F4F8', background: '#F0F9FF', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#00A3E0', fontFamily: FONT },
+  newConvItem: { width: '100%', padding: '14px 16px', textAlign: 'left', border: 'none', borderBottom: '1px solid #F0F4F8', background: '#EEEEFC', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#5B5BD6', fontFamily: FONT },
   convItem: { width: '100%', padding: '12px 16px', textAlign: 'left', border: 'none', borderBottom: '1px solid #F5F7FA', background: 'white', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: FONT },
-  convItemActive: { backgroundColor: '#F0F9FF' },
+  convItemActive: { backgroundColor: '#EEEEFC' },
   convTitle: { fontSize: '14px', color: '#2D3436', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   convDate: { fontSize: '11px', color: '#8A92A0', marginLeft: '8px', flexShrink: 0 },
   convEmpty: { padding: '16px', textAlign: 'center', color: '#8A92A0', fontSize: '14px', margin: 0 },
@@ -415,13 +454,14 @@ const styles = {
   emptyTitle: { fontSize: '22px', fontWeight: 700, color: '#2D3436', margin: 0 },
   emptySubtitle: { fontSize: '15px', color: '#636E72', margin: 0, maxWidth: '320px', lineHeight: 1.5 },
   suggestions: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '380px', marginTop: '8px' },
-  suggestion: { padding: '10px 16px', backgroundColor: 'white', border: '1px solid #E1E8ED', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', color: '#00A3E0', fontFamily: FONT, textAlign: 'left', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
+  suggestion: { padding: '10px 16px', backgroundColor: 'white', border: '1px solid #E1E8ED', borderRadius: '20px', cursor: 'pointer', fontSize: '13px', color: '#5B5BD6', fontFamily: FONT, textAlign: 'left', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
 
   // Bubbles
   msgRow: { display: 'flex', alignItems: 'flex-end', gap: '8px' },
-  avatar: { fontSize: '24px', flexShrink: 0, marginBottom: '4px' },
-  bubble: { maxWidth: '78%', padding: '10px 14px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '4px' },
-  bubbleUser: { backgroundColor: '#00A3E0', color: 'white', borderBottomRightRadius: '4px' },
+  avatar: { fontSize: '24px', flexShrink: 0, alignSelf: 'flex-start', marginTop: '2px' },
+  msgCol: { maxWidth: '82%', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 },
+  bubble: { maxWidth: '100%', padding: '10px 14px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '4px' },
+  bubbleUser: { backgroundColor: '#5B5BD6', color: 'white', borderBottomRightRadius: '4px' },
   bubbleAgent: { backgroundColor: 'white', color: '#2D3436', borderBottomLeftRadius: '4px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
   bubbleError: { backgroundColor: '#FEF2F2', color: '#C75050' },
   bubbleText: { margin: 0, fontSize: '15px', lineHeight: 1.5, whiteSpace: 'pre-wrap' },
@@ -439,6 +479,6 @@ const styles = {
   inputRow: { display: 'flex', gap: '8px', alignItems: 'flex-end' },
   voiceBtn: { width: '44px', height: '44px', borderRadius: '12px', border: '1px solid #E1E8ED', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' },
   textarea: { flex: 1, padding: '10px 14px', fontSize: '15px', fontFamily: FONT, border: '1px solid #E1E8ED', borderRadius: '12px', outline: 'none', resize: 'none', backgroundColor: '#F5F7FA', color: '#2D3436', lineHeight: 1.5, maxHeight: '120px', overflowY: 'auto' },
-  sendBtn: { width: '44px', height: '44px', borderRadius: '12px', backgroundColor: '#00A3E0', color: 'white', border: 'none', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'opacity 0.2s' },
+  sendBtn: { width: '44px', height: '44px', borderRadius: '12px', backgroundColor: '#5B5BD6', color: 'white', border: 'none', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'opacity 0.2s' },
   hint: { margin: '6px 0 0', fontSize: '11px', color: '#BDC3C7', textAlign: 'center' },
 }

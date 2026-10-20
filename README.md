@@ -63,6 +63,26 @@ VITE_SUPABASE_ANON_KEY=...
 3. `tasks_table.sql` — tâches corvées/travaux
 4. `add_transaction_type.sql` — colonne type sur transactions
 5. `add_recurring_type.sql` — colonne type sur recurring_templates
+6. `agent_actions.sql` — journal des actions de l'agent (confirmation et annulation)
+
+## Agent IA
+
+L'agent interroge les données à la demande (dépenses, budgets, recettes, repas planifiés, courses, tâches, agenda, emails) et peut agir :
+
+- **Courses, repas, tâches** : exécutés immédiatement, l'agent annonce ce qu'il a changé et une carte propose **Annuler**.
+- **Finances** : l'agent *propose* la dépense ou le revenu, rien n'est enregistré avant d'appuyer sur **Confirmer**.
+
+Après avoir lancé `agent_actions.sql`, redéployer la fonction :
+
+```
+supabase functions deploy family-agent --no-verify-jwt
+```
+
+Code : `supabase/functions/family-agent` (routage) et `supabase/functions/_shared/agent_*.ts` (outils, boucle, actions, config). Tests (Deno, sans réseau ni clé API) :
+
+```
+deno test supabase/functions/_shared/agent.test.ts
+```
 
 ## Intégration Google
 
