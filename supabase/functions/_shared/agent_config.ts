@@ -56,20 +56,41 @@ export const AGENT_CONFIG = {
 
   // --------------------------------------------------------------------------
   // Modèles Anthropic
+  //
+  // L'utilisateur choisit un MODE dans l'application (table agent_settings).
+  // Le mode par défaut est le moins cher. Les prix sont en dollars par million de
+  // tokens et ne servent qu'à ESTIMER le coût affiché (ils peuvent évoluer : vérifier
+  // sur la page de tarifs d'Anthropic).
   // --------------------------------------------------------------------------
   models: {
-    /** Modèle utilisé pour les questions simples */
-    fast: 'claude-haiku-4-5-20251001',
+    /** Modes proposés à l'utilisateur */
+    modes: {
+      /** Le moins cher : toujours Haiku */
+      economy: { model: 'claude-haiku-5-5', effort: 'low', price: { input: 0.10, output: 0.50 } },
+      /** Compromis : toujours Sonnet */
+      balanced: { model: 'claude-sonnet-5-5', effort: 'medium', price: { input: 2.0, output: 10.0 } },
+      /** Le plus capable : Opus */
+      quality: { model: 'claude-opus-5-5', effort: 'medium', price: { input: 4.0, output: 20.0 } },
+    },
 
-    /** Modèle utilisé pour les questions complexes (analyses, comparaisons…) */
-    smart: 'claude-sonnet-4-6',
+    /** Mode « auto » : économique pour les questions simples, équilibré pour les questions complexes */
+    autoSimple: 'economy',
+    autoComplex: 'balanced',
 
-    /** Nombre maximum de tokens dans la réponse de l'agent */
-    maxTokens: 2048,
+    /** Mode utilisé si l'utilisateur n'a rien choisi (ou si la table agent_settings est absente) */
+    defaultMode: 'economy',
 
     /**
-     * Mots-clés qui déclenchent le modèle "smart" à la place du modèle "fast".
-     * Ajouter un mot ici force l'usage du modèle plus puissant pour ce type de question.
+     * Modèle de secours si le modèle choisi est refusé par l'API (400/404) dès le premier appel.
+     * Pas de paramètre `effort` : il n'est pas accepté par ce modèle.
+     */
+    fallback: { model: 'claude-haiku-4-5', price: { input: 1.0, output: 5.0 } },
+
+    /** Nombre maximum de tokens dans la réponse (la réflexion du modèle en fait partie) */
+    maxTokens: 4096,
+
+    /**
+     * Mots-clés qui, en mode « auto », déclenchent le modèle « équilibré » à la place de l'économique.
      */
     smartKeywords: [
       'analyse', 'analyze',
@@ -79,7 +100,7 @@ export const AGENT_CONFIG = {
       'explique', 'explain',
       'pourquoi', 'why',
       'strategie', 'strategy',
-      // Actions : le modèle puissant gère mieux les appels d'outils
+      // Actions : le modèle plus puissant gère mieux les appels d'outils
       'ajoute', 'ajouter', 'add', 'crée', 'créer', 'create',
       'planifie', 'planifier', 'plan', 'coche', 'cocher', 'check',
       'dépensé', 'dépense', 'spent', 'acheté', 'payé', 'paid',
@@ -87,10 +108,7 @@ export const AGENT_CONFIG = {
       'tâche', 'tache', 'task', 'menu', 'dîner', 'diner', 'dinner',
     ],
 
-    /**
-     * Longueur minimale d'un message (en caractères) pour forcer le modèle "smart",
-     * indépendamment des mots-clés.
-     */
+    /** Longueur minimale d'un message (en caractères) pour passer en « équilibré » en mode auto */
     smartMinLength: 300,
   },
 

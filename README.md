@@ -64,6 +64,7 @@ VITE_SUPABASE_ANON_KEY=...
 4. `add_transaction_type.sql` — colonne type sur transactions
 5. `add_recurring_type.sql` — colonne type sur recurring_templates
 6. `agent_actions.sql` — journal des actions de l'agent (confirmation et annulation)
+7. `agent_usage_settings.sql` — consommation de l'agent (tokens, coût estimé) et choix du modèle
 
 ## Agent IA
 
@@ -72,7 +73,9 @@ L'agent interroge les données à la demande (dépenses, budgets, recettes, repa
 - **Courses, repas, tâches** : exécutés immédiatement, l'agent annonce ce qu'il a changé et une carte propose **Annuler**.
 - **Finances** : l'agent *propose* la dépense ou le revenu, rien n'est enregistré avant d'appuyer sur **Confirmer**.
 
-Après avoir lancé `agent_actions.sql`, redéployer la fonction :
+**Modèle** : par défaut le moins cher (Claude Haiku 5.5). Le bouton ⚙️ de l'agent permet de choisir Économique, Auto, Équilibré (Sonnet) ou Maximum (Opus), et affiche la consommation du mois (estimation d'après les tarifs de `supabase/functions/_shared/agent_config.ts`). Le coût est facturé sur le compte Anthropic de la clé `ANTHROPIC_API_KEY` de la fonction.
+
+Après avoir lancé `agent_actions.sql` (et `agent_usage_settings.sql` pour le choix du modèle et le suivi), redéployer la fonction :
 
 ```
 supabase functions deploy family-agent --no-verify-jwt
