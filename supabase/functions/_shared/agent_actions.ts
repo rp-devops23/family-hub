@@ -92,7 +92,7 @@ export async function cancelAction(db: Db, userId: string, actionId: string): Pr
 }
 
 /** Applique les opérations d'annulation (tables autorisées uniquement, toujours restreintes à l'utilisateur). */
-async function applyUndo(db: Db, userId: string, plan: UndoPlan): Promise<void> {
+export async function applyUndo(db: Db, userId: string, plan: UndoPlan): Promise<void> {
   for (const op of plan.ops) {
     if (!(UNDOABLE_TABLES as readonly string[]).includes(op.table)) throw new ActionError(`Table not allowed: ${op.table}`)
     if (op.op === 'delete') {

@@ -7,7 +7,7 @@
 
 import { AGENT_CONFIG } from './agent_config.ts'
 import { runAgentLoop } from './agent_loop.ts'
-import { type ActionRow, describeDoneActions, linkActions, recordAction } from './agent_actions.ts'
+import { type ActionRow, applyUndo, describeDoneActions, linkActions, recordAction } from './agent_actions.ts'
 import {
   dateInTz, describeFinanceRefs, executeTool, type GoogleBridge, type Lang, loadFinanceRefs, TOOL_DEFINITIONS, type ToolContext,
 } from './agent_tools.ts'
@@ -128,8 +128,25 @@ export async function handleChat(deps: ChatDeps, body: { message?: string; conve
       callModel: (msgs, withTools) => deps.callAnthropic(model, system, msgs, withTools ? TOOL_DEFINITIONS : undefined),
       runTool: async (name, input) => {
         const outcome = await executeTool(name, input, ctx)
-        if (outcome.action) actions.push(await recordAction(db, userId, conversationId as string, outcome.action))
-        return outcome
+        if (!outcome.action) return outcome
+        try {
+          actions.push(await recordAction(db, userId, conversationId as string, outcome.action))
+          return outcome
+        } catch (err) {
+          // Sans journal (ex. migration agent_actions.sql pas encore appliquée) l'action ne serait ni
+          // visible ni annulable : on revient immédiatement en arrière et on le dit clairement.
+          console.error('Action log unavailable:', (err as Error).message)
+          if (outcome.action.undo) {
+            try { await applyUndo(db, userId, outcome.action.undo) } catch (e) { console.error('Rollback failed:', (e as Error).message) }
+          }
+          return {
+            isError: true,
+            result: {
+              error: 'action_log_unavailable',
+              note: 'The change was NOT applied because the actions journal is unavailable (the agent_actions migration is probably missing). Tell the user, in one sentence, that it must be applied.',
+            },
+          }
+        }
       },
     })
     text = out.text
