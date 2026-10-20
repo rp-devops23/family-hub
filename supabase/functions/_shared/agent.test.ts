@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import { cancelAction, confirmAction, undoAction } from './agent_actions.ts'
-import { handleChat, loadHistory, needsSonnet } from './agent_chat.ts'
+import { handleChat, loadHistory, type ModelCall, needsSonnet, resolveProfile } from './agent_chat.ts'
 import { executeTool, type GoogleBridge, type ToolContext } from './agent_tools.ts'
 
 // ---------------------------------------------------------------------------
@@ -139,9 +139,9 @@ const toolUse = (...uses: [string, Json][]) => ({
   content: uses.map(([name, input], i) => ({ type: 'tool_use', id: `tu_${name}_${i}`, name, input })),
 })
 function scriptedModel(steps: (Json | Error)[]) {
-  const calls: { model: string; system: string; messages: Json[]; tools?: Json[] }[] = []
-  const fn = (model: string, system: string, messages: Json[], tools?: Json[]) => {
-    calls.push({ model, system, messages: structuredClone(messages), tools })
+  const calls: { model: string; effort?: string; system: string; messages: Json[]; tools?: Json[] }[] = []
+  const fn = (call: ModelCall) => {
+    calls.push({ model: call.model, effort: call.effort, system: call.system, messages: structuredClone(call.messages), tools: call.tools })
     const next = steps.shift()
     if (next instanceof Error) return Promise.reject(next)
     return Promise.resolve(next ?? text('(fin)'))
@@ -344,7 +344,8 @@ Deno.test('boucle: plusieurs outils dans un message → un tool_result chacun, p
   const second = model.calls[1].messages.at(-1)
   assert.equal(second.role, 'user')
   assert.deepEqual(second.content.map((b: Json) => b.tool_use_id), ['tu_add_shopping_items_0', 'tu_plan_meal_1', 'tu_get_spending_summary_2'])
-  assert.equal(model.calls[0].model.includes('sonnet'), true, 'mot-clé d’action → modèle puissant')
+  assert.equal(model.calls[0].model, 'claude-haiku-5-5', 'par défaut : le modèle le moins cher')
+  assert.equal(model.calls[0].effort, 'low')
   assert.match(model.calls[0].system, /2026-10-20 \(mardi\)/)
   assert.ok(!/UUID|subcategory_id/.test(model.calls[0].system), 'plus de dump d’identifiants dans le prompt')
 })
@@ -413,4 +414,83 @@ Deno.test('journal indisponible (migration absente) : l’écriture est annulée
   assert.match(result.content, /action_log_unavailable/)
   assert.equal(res.actions.length, 0)
   assert.match(res.message, /indisponible/)
+})
+
+// ===========================================================================
+// CHOIX DU MODÈLE & CONSOMMATION
+// ===========================================================================
+const withUsage = (r: Json, input: number, output: number) => ({ ...r, usage: { input_tokens: input, output_tokens: output } })
+const chat = (db: FakeDb, fn: (c: ModelCall) => Promise<Json>, message = 'Bonjour') =>
+  handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: fn }, { message })
+
+Deno.test('modèle: mode économique par défaut, réglage de l’utilisateur respecté, mode inconnu ignoré', async () => {
+  for (const [mode, expected, effort] of [
+    [undefined, 'claude-haiku-5-5', 'low'], ['economy', 'claude-haiku-5-5', 'low'], ['balanced', 'claude-sonnet-5-5', 'medium'],
+    ['quality', 'claude-opus-5-5', 'medium'], ['nimportequoi', 'claude-haiku-5-5', 'low'],
+  ] as const) {
+    const { db } = setup()
+    if (mode) db.rows('agent_settings').push({ user_id: ME, model_mode: mode })
+    const model = scriptedModel([text('ok')])
+    await chat(db, model.fn)
+    assert.equal(model.calls[0].model, expected, `mode ${mode}`)
+    assert.equal(model.calls[0].effort, effort)
+  }
+  const { db } = setup(); db.failNext = { table: 'agent_settings', op: 'select' } // table absente / erreur
+  const model = scriptedModel([text('ok')]); await chat(db, model.fn)
+  assert.equal(model.calls[0].model, 'claude-haiku-5-5', 'sans réglage lisible : économique')
+})
+
+Deno.test('modèle: le mode auto choisit selon la question', () => {
+  assert.equal(resolveProfile('auto', 'Bonjour').profile.model, 'claude-haiku-5-5')
+  assert.equal(resolveProfile('auto', 'Ajoute du lait à la liste').profile.model, 'claude-sonnet-5-5')
+  assert.equal(resolveProfile('auto', 'x'.repeat(400)).profile.model, 'claude-sonnet-5-5')
+  assert.equal(resolveProfile('economy', 'Ajoute du lait à la liste').profile.model, 'claude-haiku-5-5', 'économique ne monte jamais')
+})
+
+Deno.test('consommation: tokens cumulés sur tous les tours, coût estimé, ligne enregistrée', async () => {
+  const { db } = setup()
+  const model = scriptedModel([
+    withUsage(toolUse(['get_tasks', {}]), 1000, 200),
+    withUsage(text('Une tâche en retard.'), 1500, 300),
+  ])
+  const res = await chat(db, model.fn, 'Quelles tâches sont en retard ?')
+  assert.deepEqual([res.usage.input_tokens, res.usage.output_tokens, res.usage.calls], [2500, 500, 2])
+  // 2500 × 0,10 $/M + 500 × 0,50 $/M
+  assert.equal(res.usage.cost_usd, 0.0005)
+  assert.equal(res.usage.model, 'claude-haiku-5-5')
+  const row = db.rows('agent_usage')[0]
+  assert.equal(row.message_id, res.assistantMessageId)
+  assert.equal(row.user_id, ME)
+  assert.deepEqual([row.input_tokens, row.output_tokens, row.calls], [2500, 500, 2])
+})
+
+Deno.test('consommation: un échec d’enregistrement du suivi ne casse jamais la réponse', async () => {
+  const { db } = setup()
+  db.failNext = { table: 'agent_usage', op: 'insert' }
+  const res = await chat(db, scriptedModel([withUsage(text('Salut !'), 10, 5)]).fn)
+  assert.equal(res.message, 'Salut !')
+  assert.equal(db.rows('agent_usage').length, 0)
+})
+
+Deno.test('modèle de secours: seulement si le modèle choisi est refusé dès le premier appel', async () => {
+  const { db } = setup()
+  const model = scriptedModel([new Error('Anthropic 400: model not supported'), withUsage(text('Réponse de secours'), 100, 50)])
+  const res = await chat(db, model.fn)
+  assert.equal(res.message, 'Réponse de secours')
+  assert.deepEqual(model.calls.map((c) => c.model), ['claude-haiku-5-5', 'claude-haiku-4-5'])
+  assert.equal(model.calls[1].effort, undefined, 'le modèle de secours ne reçoit pas le paramètre effort')
+  assert.equal(res.usage.used_fallback, true)
+  assert.equal(res.usage.cost_usd, 0.00035, 'coût calculé au tarif du modèle de secours')
+
+  // Une surcharge temporaire n'est PAS un problème de modèle : pas de repli, l'erreur remonte
+  const { db: db2 } = setup()
+  const overloaded = scriptedModel([new Error('Anthropic 529: overloaded')])
+  await assert.rejects(() => chat(db2, overloaded.fn), /529/)
+  assert.equal(overloaded.calls.length, 1)
+})
+
+Deno.test('refus du modèle: message clair plutôt qu’une réponse vide', async () => {
+  const { db } = setup()
+  const res = await chat(db, scriptedModel([{ stop_reason: 'refusal', content: [] }]).fn)
+  assert.match(res.message, /ne peux pas/)
 })

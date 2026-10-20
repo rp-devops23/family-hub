@@ -4,6 +4,8 @@ import { supabase } from '../../../lib/supabase'
 import GoogleConnectPage from './GoogleConnectPage'
 import RichText from './RichText'
 import ActionCard from './ActionCard'
+import AgentSettings from './AgentSettings'
+import { shortModel, formatUsd } from '../lib/usage'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
@@ -33,6 +35,8 @@ export default function AgentPage({ onHome }) {
   const [actionBanner,     setActionBanner]     = useState(null) // { text, success }
   const [actions,          setActions]          = useState([])   // actions de la conversation (cartes)
   const [busyActions,      setBusyActions]      = useState(() => new Set())
+  const [showSettings,     setShowSettings]     = useState(false)
+  const [usageByMessage,   setUsageByMessage]   = useState({}) // message_id → { model, cost_usd }
 
   const messagesEndRef  = useRef(null)
   const inputRef        = useRef(null)
@@ -73,15 +77,17 @@ export default function AgentPage({ onHome }) {
   }
 
   async function loadMessages(convId) {
-    const [{ data }, { data: actionRows }] = await Promise.all([
+    const [{ data }, { data: actionRows }, { data: usageRows }] = await Promise.all([
       supabase.from('agent_messages').select('id, role, content, created_at')
         .eq('conversation_id', convId).order('created_at', { ascending: true }),
       // Tolérant : tant que la migration agent_actions n'est pas appliquée, pas de cartes
       supabase.from('agent_actions').select('*')
         .eq('conversation_id', convId).order('created_at', { ascending: true }),
+      supabase.from('agent_usage').select('message_id, model, cost_usd').eq('conversation_id', convId),
     ])
     setMessages(data ?? [])
     setActions(actionRows ?? [])
+    setUsageByMessage(Object.fromEntries((usageRows ?? []).filter(u => u.message_id).map(u => [u.message_id, u])))
   }
 
   // ---- Boutons des cartes : confirmer / refuser / annuler -------------------
@@ -244,6 +250,7 @@ export default function AgentPage({ onHome }) {
           </div>
           <div style={styles.headerRight}>
             <button onClick={startNewConversation} style={styles.newChatBtn}>✏️ {t('Nouveau', 'New')}</button>
+            <button onClick={() => setShowSettings(true)} style={styles.iconBtn} title={t("Réglages de l'agent", 'Agent settings')} aria-label={t("Réglages de l'agent", 'Agent settings')}>⚙️</button>
             <button
               onClick={() => setShowGoogleConnect(true)}
               style={{ ...styles.iconBtn, ...(googleConnected ? styles.googleBtnConnected : {}) }}
@@ -323,7 +330,11 @@ export default function AgentPage({ onHome }) {
                     {msg.role === 'assistant' && !msg.error
                       ? <RichText text={msg.content} style={styles.bubbleText} />
                       : <p style={styles.bubbleText}>{msg.content}</p>}
-                    <span style={styles.bubbleTime}>{formatTime(msg.created_at)}</span>
+                    <span style={styles.bubbleTime}>
+                      {formatTime(msg.created_at)}
+                      {msg.role === 'assistant' && usageByMessage[msg.id] &&
+                        ` · ${shortModel(usageByMessage[msg.id].model)} · ≈ ${formatUsd(usageByMessage[msg.id].cost_usd)}`}
+                    </span>
                   </div>
                   {msgActions.map(action => (
                     <ActionCard
@@ -405,6 +416,10 @@ export default function AgentPage({ onHome }) {
           </p>
         </div>
       </div>
+
+      {showSettings && (
+        <AgentSettings userId={user.id} language={language} t={t} onClose={() => setShowSettings(false)} />
+      )}
 
       <style>{`
         @keyframes bounce {
