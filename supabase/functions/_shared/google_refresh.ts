@@ -65,14 +65,13 @@ export async function getValidAccessToken(userId: string): Promise<string | null
 }
 
 /**
- * Fetch upcoming Google Calendar events (next 7 days).
+ * Fetch upcoming Google Calendar events for the next `daysAhead` days.
  */
-export async function fetchCalendarEvents(accessToken: string): Promise<string> {
-  const { daysAhead, eventsLimit } = AGENT_CONFIG.calendar
+export async function fetchCalendarEvents(accessToken: string, daysAhead: number = AGENT_CONFIG.tools.calendarDaysDefault): Promise<string> {
   const now = new Date().toISOString()
   const end = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString()
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now)}&timeMax=${encodeURIComponent(end)}&singleEvents=true&orderBy=startTime&maxResults=${eventsLimit}`
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(now)}&timeMax=${encodeURIComponent(end)}&singleEvents=true&orderBy=startTime&maxResults=50`
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
   if (!res.ok) return ''
@@ -86,33 +85,31 @@ export async function fetchCalendarEvents(accessToken: string): Promise<string> 
 }
 
 /**
- * Fetch the 10 most recent Gmail messages (read and unread), with unread indicator.
+ * Fetch the most recent Gmail messages (read and unread), with unread indicator.
+ * Message details are fetched in parallel (one request per message, but concurrently).
  */
-export async function fetchGmailSummary(accessToken: string): Promise<string> {
-  const { messagesLimit } = AGENT_CONFIG.gmail
+export async function fetchGmailSummary(accessToken: string, limit: number = AGENT_CONFIG.tools.emailsDefault): Promise<string> {
   const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${messagesLimit}`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${limit}`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   if (!listRes.ok) return ''
 
   const list = await listRes.json()
-  const messages: string[] = []
-
-  for (const msg of (list.messages ?? []).slice(0, messagesLimit)) {
+  const details = await Promise.all((list.messages ?? []).slice(0, limit).map(async (msg: { id: string }) => {
     const detailRes = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )
-    if (!detailRes.ok) continue
+    if (!detailRes.ok) return null
     const detail = await detailRes.json()
     const headers: Array<{name: string, value: string}> = detail.payload?.headers ?? []
     const subject = headers.find(h => h.name === 'Subject')?.value ?? '(no subject)'
     const from = headers.find(h => h.name === 'From')?.value ?? ''
     const date = headers.find(h => h.name === 'Date')?.value ?? ''
     const isUnread = (detail.labelIds ?? []).includes('UNREAD')
-    messages.push(`[${isUnread ? 'NON LU' : 'lu'}] ${date} | De: ${from} | Sujet: ${subject}`)
-  }
+    return `[${isUnread ? 'NON LU' : 'lu'}] ${date} | De: ${from} | Sujet: ${subject}`
+  }))
 
-  return messages.join('\n')
+  return details.filter(Boolean).join('\n')
 }

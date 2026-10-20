@@ -6,51 +6,51 @@
 export const AGENT_CONFIG = {
 
   // --------------------------------------------------------------------------
-  // Données financières (base de données)
+  // Fuseau horaire de la famille (pour « aujourd'hui », « hier », « ce soir »)
   // --------------------------------------------------------------------------
-  finance: {
-    /** Nombre de transactions récentes transmises à l'agent */
-    transactionsLimit: 100,
-
-    /** Nombre de budgets actifs transmis à l'agent */
-    budgetsLimit: 20,
-  },
+  timezone: 'Europe/Paris',
 
   // --------------------------------------------------------------------------
-  // Recettes & courses (base de données)
+  // Limites des outils de lecture (l'agent interroge les données à la demande)
   // --------------------------------------------------------------------------
-  recipes: {
-    /** Nombre de recettes transmises à l'agent */
+  tools: {
+    /** Nombre maximum de transactions renvoyées par list_transactions */
+    transactionsListLimit: 50,
+
+    /** Nombre maximum de transactions lues pour calculer un résumé (5 pages de 1000) */
+    spendingScanLimit: 5000,
+
+    /** Nombre maximum de recettes renvoyées par search_recipes */
     recipesLimit: 15,
 
-    /** Nombre d'articles de liste de courses (non cochés) transmis à l'agent */
-    shoppingItemsLimit: 20,
+    /** Nombre maximum d'éléments (articles, dates…) par appel d'un outil d'écriture */
+    writeBatchLimit: 30,
+
+    /** Fenêtre par défaut de l'agenda Google (jours) et maximum autorisé */
+    calendarDaysDefault: 14,
+    calendarDaysMax: 60,
+
+    /** Nombre d'emails renvoyés par défaut et au maximum */
+    emailsDefault: 10,
+    emailsMax: 20,
   },
 
   // --------------------------------------------------------------------------
-  // Google Calendar
+  // Boucle de l'agent
   // --------------------------------------------------------------------------
-  calendar: {
-    /** Nombre de jours à venir affichés dans l'agenda (à partir d'aujourd'hui) */
-    daysAhead: 30,
+  loop: {
+    /** Nombre maximum d'allers-retours modèle ↔ outils pour une même question */
+    maxSteps: 6,
 
-    /** Nombre maximum d'événements transmis à l'agent */
-    eventsLimit: 50,
-  },
-
-  // --------------------------------------------------------------------------
-  // Gmail
-  // --------------------------------------------------------------------------
-  gmail: {
-    /** Nombre de messages récents transmis à l'agent (lus + non lus) */
-    messagesLimit: 100,
+    /** Nombre maximum d'appels d'outils au total pour une même question */
+    maxToolCalls: 12,
   },
 
   // --------------------------------------------------------------------------
   // Historique de conversation
   // --------------------------------------------------------------------------
   conversation: {
-    /** Nombre de messages chargés depuis l'historique pour le contexte */
+    /** Nombre de messages RÉCENTS chargés depuis l'historique pour le contexte */
     historyLimit: 40,
   },
 
@@ -65,7 +65,7 @@ export const AGENT_CONFIG = {
     smart: 'claude-sonnet-4-6',
 
     /** Nombre maximum de tokens dans la réponse de l'agent */
-    maxTokens: 1024,
+    maxTokens: 2048,
 
     /**
      * Mots-clés qui déclenchent le modèle "smart" à la place du modèle "fast".
@@ -79,6 +79,12 @@ export const AGENT_CONFIG = {
       'explique', 'explain',
       'pourquoi', 'why',
       'strategie', 'strategy',
+      // Actions : le modèle puissant gère mieux les appels d'outils
+      'ajoute', 'ajouter', 'add', 'crée', 'créer', 'create',
+      'planifie', 'planifier', 'plan', 'coche', 'cocher', 'check',
+      'dépensé', 'dépense', 'spent', 'acheté', 'payé', 'paid',
+      'revenu', 'salaire', 'income', 'reçu', 'received',
+      'tâche', 'tache', 'task', 'menu', 'dîner', 'diner', 'dinner',
     ],
 
     /**
