@@ -5,7 +5,7 @@ import GoogleConnectPage from './GoogleConnectPage'
 import RichText from './RichText'
 import ActionCard from './ActionCard'
 import AgentSettings from './AgentSettings'
-import { shortModel, formatUsd } from '../lib/usage'
+import { usageLabel } from '../lib/usage'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
@@ -241,25 +241,24 @@ export default function AgentPage({ onHome }) {
         {/* ---- HEADER ---- */}
         <header style={styles.header}>
           <div style={styles.headerLeft}>
-            {onHome && <button onClick={onHome} style={styles.iconBtn}>🏠</button>}
+            {onHome && <button onClick={onHome} style={styles.iconBtn} aria-label={t('Accueil', 'Home')}>🏠</button>}
             <button onClick={() => setShowConvList(v => !v)} style={styles.convBtn}>
               <span style={styles.agentIcon}>🤖</span>
               <span style={styles.headerTitle}>Family Agent</span>
-              <span style={{ fontSize: '10px', color: '#636E72', marginLeft: '4px' }}>▼</span>
+              <span style={{ fontSize: '10px', color: '#636E72', marginLeft: '2px' }}>▼</span>
             </button>
           </div>
           <div style={styles.headerRight}>
-            <button onClick={startNewConversation} style={styles.newChatBtn}>✏️ {t('Nouveau', 'New')}</button>
-            <button onClick={() => setShowSettings(true)} style={styles.iconBtn} title={t("Réglages de l'agent", 'Agent settings')} aria-label={t("Réglages de l'agent", 'Agent settings')}>⚙️</button>
+            <button onClick={startNewConversation} style={styles.iconBtn} title={t('Nouvelle conversation', 'New conversation')} aria-label={t('Nouvelle conversation', 'New conversation')}>✏️</button>
             <button
               onClick={() => setShowGoogleConnect(true)}
               style={{ ...styles.iconBtn, ...(googleConnected ? styles.googleBtnConnected : {}) }}
               title={googleConnected ? t('Google connecté', 'Google connected') : t('Connecter Google', 'Connect Google')}
+              aria-label={googleConnected ? t('Google connecté', 'Google connected') : t('Connecter Google', 'Connect Google')}
             >
               {googleConnected ? '📅✓' : '📅'}
             </button>
-            <button onClick={toggleLanguage} style={styles.iconBtn}>{language === 'fr' ? 'EN 🇬🇧' : 'FR 🇫🇷'}</button>
-            <button onClick={signOut} style={styles.iconBtn}>🚪</button>
+            <button onClick={() => setShowSettings(true)} style={styles.iconBtn} title={t("Réglages de l'agent", 'Agent settings')} aria-label={t("Réglages de l'agent", 'Agent settings')}>⚙️</button>
           </div>
         </header>
 
@@ -332,8 +331,7 @@ export default function AgentPage({ onHome }) {
                       : <p style={styles.bubbleText}>{msg.content}</p>}
                     <span style={styles.bubbleTime}>
                       {formatTime(msg.created_at)}
-                      {msg.role === 'assistant' && usageByMessage[msg.id] &&
-                        ` · ${shortModel(usageByMessage[msg.id].model)} · ≈ ${formatUsd(usageByMessage[msg.id].cost_usd)}`}
+                      {msg.role === 'assistant' && usageByMessage[msg.id] && ` · ${usageLabel(usageByMessage[msg.id])}`}
                     </span>
                   </div>
                   {msgActions.map(action => (
@@ -418,7 +416,10 @@ export default function AgentPage({ onHome }) {
       </div>
 
       {showSettings && (
-        <AgentSettings userId={user.id} language={language} t={t} onClose={() => setShowSettings(false)} />
+        <AgentSettings
+          userId={user.id} language={language} t={t} onClose={() => setShowSettings(false)}
+          onToggleLanguage={toggleLanguage} onSignOut={signOut}
+        />
       )}
 
       <style>{`
@@ -440,12 +441,12 @@ const styles = {
   container: { width: '100%', maxWidth: '600px', minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', backgroundColor: '#F5F7FA' },
 
   // Header
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: 'white', borderBottom: '1px solid #E1E8ED', position: 'sticky', top: 0, zIndex: 200, boxSizing: 'border-box' },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: '6px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '10px 12px', backgroundColor: 'white', borderBottom: '1px solid #E1E8ED', position: 'sticky', top: 0, zIndex: 200, boxSizing: 'border-box' },
+  headerLeft: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
   agentIcon: { fontSize: '22px' },
-  headerTitle: { fontSize: '18px', fontWeight: 700, color: '#2D3436' },
-  convBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' },
+  headerTitle: { fontSize: '17px', fontWeight: 700, color: '#2D3436', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  convBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: '8px', minWidth: 0 },
   iconBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px 10px', border: '1px solid #E1E8ED', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT },
   newChatBtn: { padding: '6px 12px', border: '1px solid #E1E8ED', borderRadius: '8px', background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT, fontWeight: 600, color: '#5B5BD6' },
   googleBtnConnected: { backgroundColor: '#EEF9F1', borderColor: '#9ADBB0', color: '#12804A' },

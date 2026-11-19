@@ -7,9 +7,17 @@ export const MODEL_LABELS = {
   'claude-haiku-4-5': 'Haiku 4.5',
 }
 
+// Les modèles OpenRouter (« fournisseur/modèle ») s'affichent tels quels
 export const shortModel = (id) => MODEL_LABELS[id] || String(id || '').replace(/^claude-/, '')
 
 export function formatUsd(value) {
   const n = Number(value) || 0
   return `$${n.toFixed(n > 0 && n < 0.01 ? 4 : 2)}`
+}
+
+// « Haiku 5.5 · ≈ $0.0003 » ; sans coût connu (OpenRouter) : le modèle seul
+export function usageLabel(usage) {
+  if (!usage) return ''
+  const cost = usage.cost_usd
+  return cost == null ? shortModel(usage.model) : `${shortModel(usage.model)} · ≈ ${formatUsd(cost)}`
 }
