@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict'
 import { cancelAction, confirmAction, undoAction } from './agent_actions.ts'
 import { handleChat, loadHistory, type ModelCall, needsSonnet, resolveProfile } from './agent_chat.ts'
+import { fromOpenRouterResponse, toOpenRouterRequest } from './agent_openrouter.ts'
 import { executeTool, type GoogleBridge, type ToolContext } from './agent_tools.ts'
 
 // ---------------------------------------------------------------------------
@@ -145,9 +146,9 @@ const toolUse = (...uses: [string, Json][]) => ({
   content: uses.map(([name, input], i) => ({ type: 'tool_use', id: `tu_${name}_${i}`, name, input })),
 })
 function scriptedModel(steps: (Json | Error)[]) {
-  const calls: { model: string; effort?: string; system: string; messages: Json[]; tools?: Json[] }[] = []
+  const calls: { provider: string; model: string; effort?: string; system: string; messages: Json[]; tools?: Json[] }[] = []
   const fn = (call: ModelCall) => {
-    calls.push({ model: call.model, effort: call.effort, system: call.system, messages: structuredClone(call.messages), tools: call.tools })
+    calls.push({ provider: call.provider, model: call.model, effort: call.effort, system: call.system, messages: structuredClone(call.messages), tools: call.tools })
     const next = steps.shift()
     if (next instanceof Error) return Promise.reject(next)
     return Promise.resolve(next ?? text('(fin)'))
@@ -343,7 +344,7 @@ Deno.test('boucle: plusieurs outils dans un message → un tool_result chacun, p
     toolUse(['add_shopping_items', { items: [{ name: 'Beurre' }] }], ['plan_meal', { recipe_name: 'Lasagnes', dates: ['2026-10-21'] }], ['get_spending_summary', {}]),
     text('Fait : beurre ajouté, lasagnes planifiées.'),
   ])
-  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: model.fn }, { message: 'Ajoute du beurre et planifie les lasagnes demain' })
+  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: model.fn }, { message: 'Ajoute du beurre et planifie les lasagnes demain' })
   assert.equal(res.message, 'Fait : beurre ajouté, lasagnes planifiées.')
   assert.equal(res.actions.length, 2)
   assert.ok(res.actions.every((a) => a.message_id === res.assistantMessageId))
@@ -362,7 +363,7 @@ Deno.test('boucle: plusieurs dépenses → plusieurs propositions à confirmer, 
     toolUse(['create_transaction', { amount: 20, description: 'Déjeuner', type: 'expense', category: 'restaurant' }], ['create_transaction', { amount: 15, description: 'Essence', type: 'expense' }]),
     text('Deux dépenses prêtes : merci de confirmer.'),
   ])
-  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: model.fn }, { message: "J'ai dépensé 20€ au resto et 15€ d'essence" })
+  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: model.fn }, { message: "J'ai dépensé 20€ au resto et 15€ d'essence" })
   assert.equal(res.actions.length, 2)
   assert.deepEqual(res.actions.map((a) => a.status), ['pending', 'pending'])
   assert.equal(db.rows('transactions').length, 5)
@@ -371,20 +372,20 @@ Deno.test('boucle: plusieurs dépenses → plusieurs propositions à confirmer, 
 Deno.test('boucle: une erreur après une action garde une trace annulable', async () => {
   const { db } = setup()
   const model = scriptedModel([toolUse(['add_task', { name: 'Tondre' }]), new Error('Anthropic 529: overloaded')])
-  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: model.fn }, { message: 'Ajoute une tâche : tondre' })
+  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: model.fn }, { message: 'Ajoute une tâche : tondre' })
   assert.match(res.warning ?? '', /529/)
   assert.match(res.message, /Tondre/)
   assert.equal(res.actions.length, 1)
   assert.equal(db.rows('agent_actions')[0].message_id, res.assistantMessageId, 'action rattachée donc visible et annulable')
   // Sans action effectuée, l'erreur remonte
-  await assert.rejects(() => handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: scriptedModel([new Error('boom')]).fn }, { message: 'bonjour' }), /boom/)
+  await assert.rejects(() => handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: scriptedModel([new Error('boom')]).fn }, { message: 'bonjour' }), /boom/)
 })
 
 Deno.test('conversation: on ne peut pas écrire dans la conversation d’un autre utilisateur', async () => {
   const { db } = setup()
   db.rows('agent_conversations').push({ id: 'conv-o', user_id: OTHER, title: 't' })
   await assert.rejects(
-    () => handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: scriptedModel([]).fn }, { message: 'salut', conversationId: 'conv-o' }),
+    () => handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: scriptedModel([]).fn }, { message: 'salut', conversationId: 'conv-o' }),
     /introuvable/,
   )
   assert.equal(db.rows('agent_messages').length, 0)
@@ -394,7 +395,7 @@ Deno.test('boucle: trop de tours → réponse finale sans outils', async () => {
   const { db } = setup()
   const loop = Array.from({ length: 6 }, () => toolUse(['get_tasks', {}]))
   const model = scriptedModel([...loop, text('Voici ce que j’ai.')])
-  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: model.fn }, { message: 'liste mes tâches' })
+  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: model.fn }, { message: 'liste mes tâches' })
   assert.equal(res.message, 'Voici ce que j’ai.')
   assert.equal(model.calls.at(-1)?.tools, undefined, 'dernier appel sans outils')
 })
@@ -413,7 +414,7 @@ Deno.test('journal indisponible (migration absente) : l’écriture est annulée
     toolUse(['add_shopping_items', { items: [{ name: 'Beurre' }] }]),
     text('Je ne peux pas le faire pour le moment : le journal des actions est indisponible.'),
   ])
-  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: model.fn }, { message: 'Ajoute du beurre à ma liste' })
+  const res = await handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: model.fn }, { message: 'Ajoute du beurre à ma liste' })
   assert.equal(db.rows('shopping_items').length, before, 'aucune écriture ne doit rester sans possibilité d’annuler')
   const result = model.calls[1].messages.at(-1).content[0]
   assert.equal(result.is_error, true)
@@ -427,7 +428,7 @@ Deno.test('journal indisponible (migration absente) : l’écriture est annulée
 // ===========================================================================
 const withUsage = (r: Json, input: number, output: number) => ({ ...r, usage: { input_tokens: input, output_tokens: output } })
 const chat = (db: FakeDb, fn: (c: ModelCall) => Promise<Json>, message = 'Bonjour') =>
-  handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callAnthropic: fn }, { message })
+  handleChat({ db, userId: ME, lang: 'fr', google: null, now: NOW, callLLM: fn }, { message })
 
 Deno.test('modèle: mode économique par défaut, réglage de l’utilisateur respecté, mode inconnu ignoré', async () => {
   for (const [mode, expected, effort] of [
@@ -523,4 +524,123 @@ Deno.test('recettes: si la vue des coûts est indisponible, la recherche fonctio
   const out = (await run(ctx, 'search_recipes', {})).result as Json
   assert.equal(out.recipes.length, 3)
   assert.ok(out.recipes.every((r: Json) => r.cost_eur === null))
+})
+
+// ===========================================================================
+// OPENROUTER : traduction des messages
+// ===========================================================================
+Deno.test('openrouter: la requête traduit système, historique, appels d’outils et résultats', () => {
+  const body = toOpenRouterRequest({
+    model: 'google/gemini-4-neon', system: 'Tu es un agent.',
+    messages: [
+      { role: 'user', content: 'Ajoute du lait' },
+      { role: 'assistant', content: [{ type: 'text', text: 'Je m’en occupe.' }, { type: 'tool_use', id: 'tu1', name: 'add_shopping_items', input: { items: [{ name: 'Lait' }] } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu1', content: '{"added":["Lait"]}' }] },
+    ],
+    tools: [{ name: 'get_tasks', description: 'Liste les tâches', input_schema: { type: 'object', properties: {} } }],
+  }, 4096)
+  assert.equal(body.model, 'google/gemini-4-neon')
+  assert.equal(body.max_tokens, 4096)
+  assert.deepEqual(body.usage, { include: true })
+  assert.deepEqual(body.messages[0], { role: 'system', content: 'Tu es un agent.' })
+  assert.deepEqual(body.messages[1], { role: 'user', content: 'Ajoute du lait' })
+  assert.equal(body.messages[2].role, 'assistant')
+  assert.equal(body.messages[2].content, 'Je m’en occupe.')
+  assert.deepEqual(body.messages[2].tool_calls, [{ id: 'tu1', type: 'function', function: { name: 'add_shopping_items', arguments: '{"items":[{"name":"Lait"}]}' } }])
+  assert.deepEqual(body.messages[3], { role: 'tool', tool_call_id: 'tu1', content: '{"added":["Lait"]}' })
+  assert.deepEqual(body.tools, [{ type: 'function', function: { name: 'get_tasks', description: 'Liste les tâches', parameters: { type: 'object', properties: {} } } }])
+  // Appel d'outil sans texte : content doit valoir null, pas une chaîne vide
+  const noText = toOpenRouterRequest({ model: 'm', system: 's', messages: [{ role: 'assistant', content: [{ type: 'tool_use', id: 'a', name: 'x', input: {} }] }] }, 100)
+  assert.equal(noText.messages[1].content, null)
+})
+
+Deno.test('openrouter: la réponse est ramenée au format interne (texte, outils, arrêt, coût, erreurs)', () => {
+  const tool = fromOpenRouterResponse({
+    model: 'google/gemini-4-hydrogen',
+    choices: [{ finish_reason: 'tool_calls', message: { content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'get_tasks', arguments: '{"include_done":true}' } }] } }],
+    usage: { prompt_tokens: 120, completion_tokens: 30, cost: 0.0002 },
+  })
+  assert.equal(tool.stop_reason, 'tool_use')
+  assert.deepEqual(tool.content, [{ type: 'tool_use', id: 'c1', name: 'get_tasks', input: { include_done: true } }])
+  assert.deepEqual(tool.usage, { input_tokens: 120, output_tokens: 30, cost: 0.0002 })
+  assert.equal(tool.model, 'google/gemini-4-hydrogen')
+
+  const badArgs = fromOpenRouterResponse({ choices: [{ finish_reason: 'tool_calls', message: { tool_calls: [{ id: 'c2', function: { name: 'x', arguments: '{pas du json' } }] } }] })
+  assert.deepEqual(badArgs.content[0].input, {}, 'arguments illisibles : outil appelé sans paramètres plutôt que plantage')
+
+  const text = fromOpenRouterResponse({ choices: [{ finish_reason: 'stop', message: { content: [{ type: 'text', text: 'Bon' }, { type: 'text', text: 'jour' }] } }], usage: { prompt_tokens: 5, completion_tokens: 2 } })
+  assert.deepEqual([text.stop_reason, text.content, 'cost' in text.usage], ['end_turn', [{ type: 'text', text: 'Bonjour' }], false])
+
+  assert.equal(fromOpenRouterResponse({ choices: [{ finish_reason: 'length', message: { content: 'coupé' } }] }).stop_reason, 'max_tokens')
+  assert.equal(fromOpenRouterResponse({ choices: [{ finish_reason: 'content_filter', message: { content: '' } }] }).stop_reason, 'refusal')
+  assert.throws(() => fromOpenRouterResponse({ error: { code: 404, message: 'No endpoints found for x' } }), /OpenRouter 404: No endpoints/)
+  assert.throws(() => fromOpenRouterResponse({ choices: [] }), /OpenRouter 502/)
+})
+
+// ===========================================================================
+// OPENROUTER : choix du modèle par l'utilisateur
+// ===========================================================================
+function withCustom(db: FakeDb, opts: { enabled?: boolean; owner?: string } = {}) {
+  db.rows('agent_models').push({ id: 'mod-1', user_id: opts.owner ?? ME, provider: 'openrouter', model_id: 'google/gemini-4-neon', enabled: opts.enabled ?? true })
+  db.rows('agent_settings').push({ user_id: ME, model_mode: 'custom', active_model_id: 'mod-1' })
+}
+
+Deno.test('openrouter: un modèle activé choisi par l’utilisateur est utilisé, sans paramètre effort', async () => {
+  const { db } = setup(); withCustom(db)
+  const model = scriptedModel([{ ...text('Salut'), model: 'google/gemini-4-neon', usage: { input_tokens: 100, output_tokens: 40, cost: 0.0003 } }])
+  const res = await chat(db, model.fn)
+  assert.deepEqual([model.calls[0].provider, model.calls[0].model, model.calls[0].effort], ['openrouter', 'google/gemini-4-neon', undefined])
+  assert.deepEqual([res.usage.provider, res.usage.mode, res.usage.model, res.usage.cost_usd], ['openrouter', 'custom', 'google/gemini-4-neon', 0.0003])
+  assert.equal(db.rows('agent_usage')[0].provider, 'openrouter')
+})
+
+Deno.test('openrouter: modèle désactivé, supprimé ou appartenant à quelqu’un d’autre → retour au mode économique', async () => {
+  for (const setupCase of [(db: FakeDb) => withCustom(db, { enabled: false }), (db: FakeDb) => withCustom(db, { owner: OTHER }),
+    (db: FakeDb) => db.rows('agent_settings').push({ user_id: ME, model_mode: 'custom', active_model_id: 'inexistant' })]) {
+    const { db } = setup(); setupCase(db)
+    const model = scriptedModel([text('ok')])
+    const res = await chat(db, model.fn)
+    assert.deepEqual([model.calls[0].provider, model.calls[0].model], ['anthropic', 'claude-haiku-5-5'])
+    assert.equal(res.usage.mode, 'economy')
+  }
+})
+
+Deno.test('openrouter: coût inconnu (null) si un appel ne le fournit pas ; le modèle réel d’openrouter/auto est conservé', async () => {
+  const { db } = setup(); withCustom(db)
+  db.rows('agent_models')[0].model_id = 'openrouter/auto'
+  const model = scriptedModel([
+    { ...toolUse(['get_tasks', {}]), model: 'google/gemini-4-hydrogen', usage: { input_tokens: 10, output_tokens: 5, cost: 0.0001 } },
+    { ...text('Voilà'), model: 'google/gemini-4-hydrogen', usage: { input_tokens: 20, output_tokens: 8 } }, // pas de coût
+  ])
+  const res = await chat(db, model.fn, 'Mes tâches ?')
+  assert.equal(res.usage.cost_usd, null)
+  assert.equal(res.usage.model, 'google/gemini-4-hydrogen', 'le modèle qui a réellement répondu')
+  assert.equal(db.rows('agent_usage')[0].cost_usd, null)
+  // Tous les appels avec coût : somme exacte
+  const { db: db2 } = setup(); withCustom(db2)
+  const m2 = scriptedModel([{ ...toolUse(['get_tasks', {}]), usage: { input_tokens: 1, output_tokens: 1, cost: 0.0001 } }, { ...text('ok'), usage: { input_tokens: 1, output_tokens: 1, cost: 0.0002 } }])
+  assert.equal((await chat(db2, m2.fn, 'Mes tâches ?')).usage.cost_usd, 0.0003)
+})
+
+Deno.test('openrouter: modèle rejeté (404) → repli sur le mode économique d’Anthropic', async () => {
+  const { db } = setup(); withCustom(db)
+  const model = scriptedModel([new Error('OpenRouter 404: No endpoints found for google/gemini-4-neon'), { ...text('Réponse de secours'), usage: { input_tokens: 100, output_tokens: 50 } }])
+  const res = await chat(db, model.fn)
+  assert.deepEqual(model.calls.map((c) => [c.provider, c.model]), [['openrouter', 'google/gemini-4-neon'], ['anthropic', 'claude-haiku-5-5']])
+  assert.equal(model.calls[1].effort, 'low')
+  assert.deepEqual([res.usage.used_fallback, res.usage.provider], [true, 'anthropic'])
+  // Une clé invalide ou un manque de crédit (401/402) n'est PAS un problème de modèle : l'erreur remonte
+  const { db: db2 } = setup(); withCustom(db2)
+  const m2 = scriptedModel([new Error('OpenRouter 402: insufficient credits')])
+  await assert.rejects(() => chat(db2, m2.fn), /402/)
+  assert.equal(m2.calls.length, 1)
+})
+
+Deno.test('réglages: si la colonne active_model_id manque (migration pas appliquée), le mode choisi est quand même lu', async () => {
+  const { db } = setup()
+  db.rows('agent_settings').push({ user_id: ME, model_mode: 'balanced' })
+  db.failNext = { table: 'agent_settings', op: 'select' } // 1re lecture (avec la colonne) en échec
+  const model = scriptedModel([text('ok')])
+  await chat(db, model.fn)
+  assert.equal(model.calls[0].model, 'claude-sonnet-5-5')
 })

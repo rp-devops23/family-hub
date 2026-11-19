@@ -3,6 +3,7 @@ import { fetchCalendarEvents, fetchGmailSummary, getValidAccessToken } from "../
 import { AGENT_CONFIG } from "../_shared/agent_config.ts"
 import { ChatError, handleChat, type ModelCall } from "../_shared/agent_chat.ts"
 import { ActionError, cancelAction, confirmAction, undoAction } from "../_shared/agent_actions.ts"
+import { fromOpenRouterResponse, toOpenRouterRequest } from "../_shared/agent_openrouter.ts"
 import type { GoogleBridge, Lang } from "../_shared/agent_tools.ts"
 
 // ============================================================================
@@ -32,6 +33,18 @@ async function callAnthropic(apiKey: string, call: ModelCall) {
   return res.json()
 }
 
+// OpenRouter : API compatible OpenAI ; la réponse est ramenée au format Anthropic utilisé par la boucle
+async function callOpenRouter(apiKey: string | undefined, call: ModelCall) {
+  if (!apiKey) throw new Error("OpenRouter 401: la clé OPENROUTER_API_KEY n'est pas configurée dans les secrets Supabase")
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, 'X-Title': 'Family Hub' },
+    body: JSON.stringify(toOpenRouterRequest(call, AGENT_CONFIG.models.maxTokens)),
+  })
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`)
+  return fromOpenRouterResponse(await res.json())
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -47,6 +60,7 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')!
+    const openRouterKey = Deno.env.get('OPENROUTER_API_KEY')
 
     // ---- Auth ---------------------------------------------------------------
     const authHeader = req.headers.get('Authorization')
@@ -89,7 +103,7 @@ Deno.serve(async (req) => {
     const result = await handleChat(
       {
         db, userId: user.id, lang, google,
-        callAnthropic: (call) => callAnthropic(anthropicKey, call),
+        callLLM: (call) => (call.provider === 'openrouter' ? callOpenRouter(openRouterKey, call) : callAnthropic(anthropicKey, call)),
       },
       { message: body.message, conversationId: body.conversationId },
     )

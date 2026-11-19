@@ -17,6 +17,7 @@ type Json = any
 
 /** Un appel au modèle ; `effort` n'est envoyé que pour les modèles qui l'acceptent. */
 export interface ModelCall {
+  provider: Provider
   model: string
   effort?: string
   system: string
@@ -29,22 +30,28 @@ export interface ChatDeps {
   userId: string
   lang: Lang
   google: GoogleBridge | null
-  callAnthropic: (call: ModelCall) => Promise<Json>
+  /** Appelle le modèle (Anthropic ou OpenRouter selon call.provider) et renvoie une réponse au format Anthropic */
+  callLLM: (call: ModelCall) => Promise<Json>
   now?: Date
 }
 
-export type ModelMode = 'economy' | 'auto' | 'balanced' | 'quality'
-export const MODEL_MODES: ModelMode[] = ['economy', 'auto', 'balanced', 'quality']
+export type Provider = 'anthropic' | 'openrouter'
+// « custom » = un modèle OpenRouter choisi par l'utilisateur dans sa liste (table agent_models)
+export type ModelMode = 'economy' | 'auto' | 'balanced' | 'quality' | 'custom'
+export const MODEL_MODES: ModelMode[] = ['economy', 'auto', 'balanced', 'quality', 'custom']
 
-interface Profile { model: string; effort?: string; price: { input: number; output: number } }
+/** `price` absent = coût non estimable ici (OpenRouter renvoie le coût réel quand il le peut) */
+interface Profile { provider: Provider; model: string; effort?: string; price?: { input: number; output: number } }
 
 export interface UsageInfo {
+  provider: Provider
   model: string
   mode: ModelMode
   input_tokens: number
   output_tokens: number
   calls: number
-  cost_usd: number
+  /** null = coût inconnu (modèle OpenRouter dont le coût n'a pas été renvoyé) */
+  cost_usd: number | null
   /** true si le modèle choisi a été refusé par l'API et que le modèle de secours a répondu */
   used_fallback: boolean
 }
@@ -69,22 +76,47 @@ export function needsSonnet(message: string): boolean {
   return smartKeywords.some((k) => text.includes(k)) || message.length > smartMinLength
 }
 
-/** Mode choisi par l'utilisateur (null si aucun réglage ou table absente : on garde le défaut). */
-export async function loadModelMode(db: Json, userId: string): Promise<string | null> {
+export interface ModelSettings { mode: string | null; activeModelId: string | null }
+
+/** Réglage de l'utilisateur (null si aucun réglage ou tables absentes : on garde le défaut). */
+export async function loadModelSettings(db: Json, userId: string): Promise<ModelSettings | null> {
   try {
-    const { data, error } = await db.from('agent_settings').select('model_mode').eq('user_id', userId).maybeSingle()
-    return error ? null : (data?.model_mode ?? null)
+    let res = await db.from('agent_settings').select('model_mode, active_model_id').eq('user_id', userId).maybeSingle()
+    // Colonne active_model_id absente (migration agent_models.sql pas encore appliquée) : on relit sans elle
+    if (res.error) res = await db.from('agent_settings').select('model_mode').eq('user_id', userId).maybeSingle()
+    if (res.error || !res.data) return null
+    return { mode: res.data.model_mode ?? null, activeModelId: res.data.active_model_id ?? null }
   } catch {
     return null
   }
 }
 
-/** Traduit un mode en modèle. « auto » choisit selon la question ; un mode inconnu retombe sur le défaut. */
-export function resolveProfile(mode: string | null | undefined, message: string): { mode: ModelMode; profile: Profile } {
+/** Modèle OpenRouter choisi : il doit appartenir à l'utilisateur ET être activé. */
+export async function loadCustomModel(db: Json, userId: string, modelRowId: string): Promise<{ model_id: string } | null> {
+  try {
+    const { data, error } = await db.from('agent_models').select('model_id, enabled')
+      .eq('id', modelRowId).eq('user_id', userId).maybeSingle()
+    return !error && data?.enabled ? { model_id: data.model_id } : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Traduit un mode en modèle. « auto » choisit selon la question ; « custom » utilise le modèle OpenRouter
+ * fourni (sinon retour au défaut) ; un mode inconnu retombe sur le défaut.
+ */
+export function resolveProfile(
+  mode: string | null | undefined, message: string, custom?: { model_id: string } | null,
+): { mode: ModelMode; profile: Profile } {
   const m = AGENT_CONFIG.models
-  const chosen = (MODEL_MODES as string[]).includes(mode ?? '') ? (mode as ModelMode) : (m.defaultMode as ModelMode)
+  let chosen = (MODEL_MODES as string[]).includes(mode ?? '') ? (mode as ModelMode) : (m.defaultMode as ModelMode)
+  if (chosen === 'custom') {
+    if (custom) return { mode: 'custom', profile: { provider: 'openrouter', model: custom.model_id } }
+    chosen = m.defaultMode as ModelMode // modèle supprimé, désactivé ou introuvable
+  }
   const key = chosen === 'auto' ? (needsSonnet(message) ? m.autoComplex : m.autoSimple) : chosen
-  return { mode: chosen, profile: m.modes[key as keyof typeof m.modes] }
+  return { mode: chosen, profile: { provider: 'anthropic', ...m.modes[key as keyof typeof m.modes] } }
 }
 
 export function estimateCostUsd(price: { input: number; output: number }, inputTokens: number, outputTokens: number): number {
@@ -92,7 +124,15 @@ export function estimateCostUsd(price: { input: number; output: number }, inputT
 }
 
 /** Le modèle lui-même est refusé (identifiant inconnu, paramètre non accepté…) : un repli a du sens. */
-const isModelRejected = (err: unknown) => /Anthropic (400|404)/.test((err as Error)?.message ?? '')
+const isModelRejected = (err: unknown) => /(Anthropic|OpenRouter) (400|404)/.test((err as Error)?.message ?? '')
+
+/** Modèle de secours : OpenRouter retombe sur le mode économique d'Anthropic, Anthropic sur son modèle de secours. */
+function fallbackFor(active: Profile): Profile {
+  const m = AGENT_CONFIG.models
+  return active.provider === 'openrouter'
+    ? { provider: 'anthropic', ...m.modes.economy }
+    : { provider: 'anthropic', ...m.fallback }
+}
 
 export function buildSystemPrompt(now: Date, lang: Lang, financeText: string): string {
   const tz = AGENT_CONFIG.timezone
@@ -167,28 +207,33 @@ export async function handleChat(deps: ChatDeps, body: { message?: string; conve
   const ctx: ToolContext = { db, userId, lang, google: deps.google, now }
   const financeText = describeFinanceRefs(await loadFinanceRefs(ctx), lang)
   const system = buildSystemPrompt(now, lang, financeText)
-  const { mode, profile } = resolveProfile(await loadModelMode(db, userId), message)
+  const settings = await loadModelSettings(db, userId)
+  const custom = settings?.mode === 'custom' && settings.activeModelId ? await loadCustomModel(db, userId, settings.activeModelId) : null
+  const { mode, profile } = resolveProfile(settings?.mode, message, custom)
   let active: Profile = profile
   let usedFallback = false
-  const usage = { input: 0, output: 0, calls: 0 }
+  // cost : somme des coûts réels renvoyés par OpenRouter ; allCosts = vrai si CHAQUE appel en a fourni un
+  const usage = { input: 0, output: 0, calls: 0, cost: 0, allCosts: true, servedBy: undefined as string | undefined }
   const addUsage = (res: Json) => {
     usage.calls++
     usage.input += (res?.usage?.input_tokens ?? 0) + (res?.usage?.cache_creation_input_tokens ?? 0) + (res?.usage?.cache_read_input_tokens ?? 0)
     usage.output += res?.usage?.output_tokens ?? 0
+    if (typeof res?.usage?.cost === 'number') usage.cost += res.usage.cost; else usage.allCosts = false
+    if (typeof res?.model === 'string') usage.servedBy = res.model
   }
   // Un seul essai de secours, uniquement au tout premier appel (sans blocs de réflexion à rejouer)
   const callModel = async (msgs: Json[], withTools: boolean) => {
-    const call: ModelCall = { model: active.model, effort: active.effort, system, messages: msgs, tools: withTools ? TOOL_DEFINITIONS : undefined }
+    const call: ModelCall = { provider: active.provider, model: active.model, effort: active.effort, system, messages: msgs, tools: withTools ? TOOL_DEFINITIONS : undefined }
     try {
-      const res = await deps.callAnthropic(call)
+      const res = await deps.callLLM(call)
       addUsage(res)
       return res
     } catch (err) {
       if (usage.calls > 0 || usedFallback || !isModelRejected(err)) throw err
       console.error(`Model ${active.model} rejected, falling back:`, (err as Error).message)
       usedFallback = true
-      active = AGENT_CONFIG.models.fallback
-      const res = await deps.callAnthropic({ ...call, model: active.model, effort: undefined })
+      active = fallbackFor(active)
+      const res = await deps.callLLM({ ...call, provider: active.provider, model: active.model, effort: active.effort })
       addUsage(res)
       return res
     }
@@ -252,13 +297,20 @@ export async function handleChat(deps: ChatDeps, body: { message?: string; conve
   await db.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId).eq('user_id', userId)
 
   // ---- Consommation : estimation enregistrée, sans jamais faire échouer la réponse ----
+  // Anthropic : coût estimé d'après nos tarifs. OpenRouter : coût réel renvoyé, sinon inconnu (null).
+  const costUsd = active.price
+    ? estimateCostUsd(active.price, usage.input, usage.output)
+    : (usage.allCosts && usage.calls > 0 ? Math.round(usage.cost * 1e6) / 1e6 : null)
   const info: UsageInfo = {
-    model: active.model, mode, input_tokens: usage.input, output_tokens: usage.output, calls: usage.calls,
-    cost_usd: estimateCostUsd(active.price, usage.input, usage.output), used_fallback: usedFallback,
+    provider: active.provider,
+    // Avec openrouter/auto, on garde le modèle qui a réellement répondu
+    model: active.provider === 'openrouter' && usage.servedBy ? usage.servedBy : active.model,
+    mode, input_tokens: usage.input, output_tokens: usage.output, calls: usage.calls,
+    cost_usd: costUsd, used_fallback: usedFallback,
   }
   try {
     const { error: usageError } = await db.from('agent_usage').insert({
-      user_id: userId, conversation_id: conversationId, message_id: assistant.id, model: info.model,
+      user_id: userId, conversation_id: conversationId, message_id: assistant.id, model: info.model, provider: info.provider,
       input_tokens: info.input_tokens, output_tokens: info.output_tokens, calls: info.calls,
       tool_calls: actions.length, cost_usd: info.cost_usd,
     })
