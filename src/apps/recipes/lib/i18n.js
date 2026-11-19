@@ -53,7 +53,15 @@ const translations = {
       'recipe.notes': 'Notes',
       'recipe.notes.placeholder': 'Instructions, astuces, etc.',
       'recipe.mealType': 'Type de plat',
-      'recipe.priceRange': 'Budget',
+      'recipe.price': 'Prix de la recette',
+      'price.unknown': 'Prix inconnu',
+      'price.unknownHint': 'Renseignez les quantités (avec leur unité) et les prix des ingrédients pour le calculer.',
+      'price.partialLabel': 'minimum',
+      'price.partialHint': 'Prix incomplet : il manque une quantité ou un prix pour',
+      'price.newHint': 'Calculé automatiquement après l’enregistrement, d’après les prix des ingrédients.',
+      'filter.maxPrice': 'Prix max',
+      'filter.maxPrice.placeholder': 'Ex : 12',
+      'filter.maxPrice.hidden': '{count} recette(s) sans prix connu non affichée(s)',
       'recipe.save': 'Enregistrer',
       'recipe.cancel': 'Annuler',
       'recipe.delete': 'Supprimer',
@@ -87,9 +95,6 @@ const translations = {
       'mealType.dessert': 'Dessert',
 
       // Price range
-      'priceRange.cheap': 'Économique',
-      'priceRange.medium': 'Moyen',
-      'priceRange.expensive': 'Cher',
 
       // Calendar
       'calendar.title': 'Planning des repas',
@@ -224,7 +229,15 @@ const translations = {
       'recipe.notes': 'Notes',
       'recipe.notes.placeholder': 'Instructions, tips, etc.',
       'recipe.mealType': 'Meal type',
-      'recipe.priceRange': 'Budget',
+      'recipe.price': 'Recipe price',
+      'price.unknown': 'Price unknown',
+      'price.unknownHint': 'Add the quantities (with their unit) and the ingredient prices to calculate it.',
+      'price.partialLabel': 'minimum',
+      'price.partialHint': 'Incomplete price: a quantity or a price is missing for',
+      'price.newHint': 'Calculated automatically after saving, from the ingredient prices.',
+      'filter.maxPrice': 'Max price',
+      'filter.maxPrice.placeholder': 'E.g. 12',
+      'filter.maxPrice.hidden': '{count} recipe(s) with no known price hidden',
       'recipe.save': 'Save',
       'recipe.cancel': 'Cancel',
       'recipe.delete': 'Delete',
@@ -258,9 +271,6 @@ const translations = {
       'mealType.dessert': 'Dessert',
 
       // Price range
-      'priceRange.cheap': 'Budget',
-      'priceRange.medium': 'Medium',
-      'priceRange.expensive': 'Expensive',
 
       // Calendar
       'calendar.title': 'Meal planning',
@@ -376,11 +386,4 @@ export const MEAL_TYPES = ['appetizer', 'starter', 'main', 'side', 'dessert']
 export function getMealTypeEmoji(mealType) {
   const emojis = { appetizer: '🥂', starter: '🥗', main: '🍽️', side: '🥔', dessert: '🍰' }
   return emojis[mealType] || '🍽️'
-}
-
-export const PRICE_RANGES = ['cheap', 'medium', 'expensive']
-
-export function getPriceRangeSymbol(priceRange) {
-  const symbols = { cheap: '€', medium: '€€', expensive: '€€€' }
-  return symbols[priceRange] || '€€'
 }

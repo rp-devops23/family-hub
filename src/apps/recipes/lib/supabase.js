@@ -148,13 +148,28 @@ export async function deleteIngredient(ingredientId) {
 // ============================================
 
 export async function getRecipes(userId) {
-  const { data, error } = await supabase
-    .from('recipes')
-    .select(`*, base:bases(*), cuisine:cuisines(*), recipe_tags(tag_id), recipe_ingredients(id, ingredient_id, quantity, unit, sort_order, ingredient:ingredients(*))`)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+  const [{ data, error }, costs] = await Promise.all([
+    supabase
+      .from('recipes')
+      .select(`*, base:bases(*), cuisine:cuisines(*), recipe_tags(tag_id), recipe_ingredients(id, ingredient_id, quantity, unit, sort_order, ingredient:ingredients(*))`)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    getRecipeCosts(),
+  ])
   if (error) throw error
-  return data
+  // Prix calculé par la base : rattaché à chaque recette (absent = prix inconnu)
+  return data.map(recipe => ({ ...recipe, cost: costs.get(recipe.id) ?? null }))
+}
+
+// Vue recipe_costs (security_invoker : seules les recettes de l'utilisateur sont renvoyées).
+// Tolérant : si la vue est indisponible, les recettes s'affichent simplement sans prix.
+async function getRecipeCosts() {
+  const { data, error } = await supabase.from('recipe_costs').select('recipe_id, known_cost, missing_count, missing_ingredients')
+  if (error) {
+    console.warn('recipe_costs unavailable:', error.message)
+    return new Map()
+  }
+  return new Map((data ?? []).map(row => [row.recipe_id, row]))
 }
 
 export async function createRecipe(userId, recipe, tagIds = [], ingredientsList = []) {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { colors, fonts, fontSizes, spacing, borderRadius, shadows, getSeasonColor } from '../lib/theme'
-import { SEASONS, DIFFICULTIES, MEAL_TYPES, PRICE_RANGES, getSeasonEmoji, getMealTypeEmoji, getPriceRangeSymbol } from '../lib/i18n'
+import { SEASONS, DIFFICULTIES, MEAL_TYPES, getSeasonEmoji, getMealTypeEmoji } from '../lib/i18n'
 
 export default function FilterPanel({ filters, onChange }) {
   const { t, getName, tags, bases, cuisines } = useApp()
@@ -10,9 +10,9 @@ export default function FilterPanel({ filters, onChange }) {
   const hasActiveFilters =
     filters.seasons.length > 0 || filters.tags.length > 0 || filters.bases.length > 0 ||
     filters.cuisines.length > 0 || filters.difficulties.length > 0 ||
-    filters.mealTypes.length > 0 || filters.priceRanges.length > 0
+    filters.mealTypes.length > 0 || filters.maxPrice !== ''
 
-  const activeCount = Object.values(filters).reduce((n, f) => n + f.length, 0)
+  const activeCount = Object.values(filters).reduce((n, f) => n + (Array.isArray(f) ? f.length : f !== '' ? 1 : 0), 0)
 
   const toggle = (key, value) => {
     const current = filters[key]
@@ -20,7 +20,7 @@ export default function FilterPanel({ filters, onChange }) {
     onChange({ ...filters, [key]: next })
   }
 
-  const clearFilters = () => onChange({ seasons: [], tags: [], bases: [], cuisines: [], difficulties: [], mealTypes: [], priceRanges: [] })
+  const clearFilters = () => onChange({ seasons: [], tags: [], bases: [], cuisines: [], difficulties: [], mealTypes: [], maxPrice: '' })
 
   const chip = (active, activeColor) => ({
     ...styles.chip,
@@ -54,14 +54,16 @@ export default function FilterPanel({ filters, onChange }) {
           </div>
 
           <div style={styles.section}>
-            <label style={styles.sectionLabel}>{t('recipe.priceRange')}</label>
-            <div style={styles.chipGroup}>
-              {PRICE_RANGES.map(price => (
-                <button key={price} type="button" onClick={() => toggle('priceRanges', price)}
-                  style={chip(filters.priceRanges.includes(price), colors.gold)}>
-                  {getPriceRangeSymbol(price)} {t(`priceRange.${price}`)}
-                </button>
-              ))}
+            <label style={styles.sectionLabel}>{t('filter.maxPrice')}</label>
+            <div style={styles.priceRow}>
+              <input
+                type="number" inputMode="decimal" min="0" step="1"
+                value={filters.maxPrice}
+                onChange={e => onChange({ ...filters, maxPrice: e.target.value })}
+                placeholder={t('filter.maxPrice.placeholder')}
+                style={styles.priceInput}
+              />
+              <span style={styles.priceUnit}>€</span>
             </div>
           </div>
 
@@ -143,6 +145,9 @@ export default function FilterPanel({ filters, onChange }) {
 }
 
 const styles = {
+  priceRow: { display: 'flex', alignItems: 'center', gap: '8px' },
+  priceInput: { width: '110px', padding: '8px 12px', fontSize: fontSizes.md, border: `1.5px solid ${colors.warmGray}`, borderRadius: borderRadius.md, backgroundColor: colors.white, color: colors.textPrimary, outline: 'none', fontFamily: fonts.body },
+  priceUnit: { fontSize: fontSizes.md, fontWeight: 600, color: colors.textSecondary },
   container: { marginBottom: '12px' },
   toggleButton: {
     width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',

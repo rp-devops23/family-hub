@@ -1,9 +1,11 @@
 import { useApp } from '../context/RecipeContext'
 import { colors, fonts, fontSizes, spacing, borderRadius, getSeasonColor, getDifficultyColor } from '../lib/theme'
-import { getSeasonEmoji, getMealTypeEmoji, getPriceRangeSymbol } from '../lib/i18n'
+import { getSeasonEmoji, getMealTypeEmoji } from '../lib/i18n'
+import { recipePrice, formatEuro } from '../lib/price'
 
 export default function RecipeCard({ recipe, onClick }) {
-  const { t, getName, tags } = useApp()
+  const { t, language, getName, tags } = useApp()
+  const price = recipePrice(recipe)
 
   const recipeTags = recipe.recipe_tags
     ?.map(rt => tags.find(tag => tag.id === rt.tag_id))
@@ -19,9 +21,16 @@ export default function RecipeCard({ recipe, onClick }) {
           <h3 style={styles.name}>{recipe.name}</h3>
         </div>
         <div style={styles.badges}>
-          {recipe.price_range && (
-            <span style={styles.priceBadge}>{getPriceRangeSymbol(recipe.price_range)}</span>
-          )}
+          <span
+            style={{ ...styles.priceBadge, ...(price.status === 'complete' ? {} : styles.priceBadgeMuted) }}
+            title={price.status === 'complete' ? undefined
+              : price.status === 'partial' ? `${t('price.partialHint')} ${price.missing.join(', ')}`
+              : t('price.unknownHint')}
+          >
+            {price.status === 'complete' && `≈ ${formatEuro(price.amount, language)}`}
+            {price.status === 'partial' && `≥ ${formatEuro(price.amount, language)}`}
+            {price.status === 'unknown' && '€ ?'}
+          </span>
           {recipe.difficulty && (
             <span style={{ ...styles.badge, backgroundColor: getDifficultyColor(recipe.difficulty) + '18', color: getDifficultyColor(recipe.difficulty) }}>
               {t(`difficulty.${recipe.difficulty}`)}
@@ -77,6 +86,7 @@ const styles = {
   badges: { display: 'flex', gap: '6px', flexShrink: 0 },
   badge: { fontSize: fontSizes.xs, fontWeight: 600, padding: '3px 10px', borderRadius: borderRadius.full, whiteSpace: 'nowrap' },
   priceBadge: { fontSize: fontSizes.xs, fontWeight: 700, padding: '3px 10px', borderRadius: borderRadius.full, backgroundColor: colors.gold + '1A', color: colors.gold },
+  priceBadgeMuted: { backgroundColor: colors.background, color: colors.textMuted },
   meta: { display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' },
   metaItem: { fontSize: '13px', color: colors.textSecondary },
   seasons: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' },

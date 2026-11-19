@@ -107,6 +107,12 @@ function seed(db: FakeDb) {
     { id: 'ri2', recipe_id: 'r-other', ingredient_id: 'i-other' },
   ]
   t.tags = []; t.recipe_tags = []
+  // Coût calculé par la base (vue recipe_costs) : complet, partiel, absent
+  t.recipe_costs = [
+    { recipe_id: 'r-pat1', known_cost: '8.40', missing_count: 0 },
+    { recipe_id: 'r-pat2', known_cost: '5.10', missing_count: 2 },
+    { recipe_id: 'r-other', known_cost: '1.00', missing_count: 0 },
+  ]
   t.transactions = [
     { id: 'tx1', user_id: ME, date: '2026-10-03', amount: 100, type: 'expense', description: 'Carrefour', subcategory_id: 's-groc', account_id: 'a-main' },
     { id: 'tx2', user_id: ME, date: '2026-10-10', amount: 50, type: 'expense', description: 'Resto', subcategory_id: 's-rest', account_id: 'a-main' },
@@ -413,4 +419,28 @@ Deno.test('journal indisponible (migration absente) : l’écriture est annulée
   assert.match(result.content, /action_log_unavailable/)
   assert.equal(res.actions.length, 0)
   assert.match(res.message, /indisponible/)
+})
+
+Deno.test('recettes: le coût calculé remplace l’ancien niveau de prix, avec son état (complet, minimum, inconnu)', async () => {
+  const { ctx } = setup()
+  const all = (await run(ctx, 'search_recipes', {})).result as Json
+  const byName = Object.fromEntries(all.recipes.map((r: Json) => [r.name, r]))
+  assert.deepEqual([byName['Pâtes tomate'].cost_eur, byName['Pâtes tomate'].cost_complete], [8.4, true])
+  assert.deepEqual([byName['Pâtes carbonara'].cost_eur, byName['Pâtes carbonara'].cost_complete], [5.1, false])
+  assert.deepEqual([byName['Lasagnes'].cost_eur, byName['Lasagnes'].cost_complete], [null, false], 'aucun coût connu')
+  assert.equal('price_range' in byName['Lasagnes'], false)
+  assert.equal(all.recipes.some((r: Json) => r.name === 'Recette privée'), false, 'jamais le coût des recettes d’un autre')
+
+  const cheap = (await run(ctx, 'search_recipes', { max_cost_eur: 6 })).result as Json
+  assert.deepEqual(cheap.recipes.map((r: Json) => r.name), ['Pâtes carbonara'], 'les recettes sans coût connu sont écartées')
+  const wide = (await run(ctx, 'search_recipes', { max_cost_eur: 20 })).result as Json
+  assert.deepEqual(wide.recipes.map((r: Json) => r.name).sort(), ['Pâtes carbonara', 'Pâtes tomate'])
+})
+
+Deno.test('recettes: si la vue des coûts est indisponible, la recherche fonctionne sans prix', async () => {
+  const { db, ctx } = setup()
+  db.failNext = { table: 'recipe_costs', op: 'select' }
+  const out = (await run(ctx, 'search_recipes', {})).result as Json
+  assert.equal(out.recipes.length, 3)
+  assert.ok(out.recipes.every((r: Json) => r.cost_eur === null))
 })
