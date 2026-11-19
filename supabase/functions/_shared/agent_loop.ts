@@ -28,7 +28,7 @@ function serialize(result: unknown): string {
 const textOf = (content: Json[] | undefined) =>
   (content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim()
 
-export async function runAgentLoop(opts: LoopOptions): Promise<{ text: string; toolCalls: number }> {
+export async function runAgentLoop(opts: LoopOptions): Promise<{ text: string; toolCalls: number; stopReason?: string }> {
   const maxSteps = opts.maxSteps ?? AGENT_CONFIG.loop.maxSteps
   const maxToolCalls = opts.maxToolCalls ?? AGENT_CONFIG.loop.maxToolCalls
   const messages = [...opts.messages]
@@ -38,7 +38,7 @@ export async function runAgentLoop(opts: LoopOptions): Promise<{ text: string; t
     const res = await opts.callModel(messages, true)
     const toolUses = (res.content ?? []).filter((b: Json) => b.type === 'tool_use')
     if (res.stop_reason !== 'tool_use' || toolUses.length === 0) {
-      return { text: textOf(res.content), toolCalls }
+      return { text: textOf(res.content), toolCalls, stopReason: res.stop_reason }
     }
 
     // Chaque tool_use doit recevoir un tool_result (sinon l'API refuse la suite)
@@ -59,5 +59,5 @@ export async function runAgentLoop(opts: LoopOptions): Promise<{ text: string; t
   // Trop de tours : on demande une réponse finale sans outils
   messages.push({ role: 'user', content: 'Answer now with what you have, without calling more tools.' })
   const last = await opts.callModel(messages, false)
-  return { text: textOf(last.content), toolCalls }
+  return { text: textOf(last.content), toolCalls, stopReason: last.stop_reason }
 }

@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { fetchCalendarEvents, fetchGmailSummary, getValidAccessToken } from "../_shared/google_refresh.ts"
 import { AGENT_CONFIG } from "../_shared/agent_config.ts"
-import { ChatError, handleChat } from "../_shared/agent_chat.ts"
+import { ChatError, handleChat, type ModelCall } from "../_shared/agent_chat.ts"
 import { ActionError, cancelAction, confirmAction, undoAction } from "../_shared/agent_actions.ts"
 import type { GoogleBridge, Lang } from "../_shared/agent_tools.ts"
 
@@ -17,9 +17,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-async function callAnthropic(apiKey: string, model: string, system: string, messages: unknown[], tools?: unknown[]) {
-  const body: Record<string, unknown> = { model, max_tokens: AGENT_CONFIG.models.maxTokens, system, messages }
-  if (tools?.length) body.tools = tools
+async function callAnthropic(apiKey: string, call: ModelCall) {
+  const body: Record<string, unknown> = { model: call.model, max_tokens: AGENT_CONFIG.models.maxTokens, system: call.system, messages: call.messages }
+  if (call.tools?.length) body.tools = call.tools
+  // Profondeur de réflexion : seulement pour les modèles qui acceptent ce paramètre
+  if (call.effort) body.output_config = { effort: call.effort }
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -87,7 +89,7 @@ Deno.serve(async (req) => {
     const result = await handleChat(
       {
         db, userId: user.id, lang, google,
-        callAnthropic: (model, system, messages, tools) => callAnthropic(anthropicKey, model, system, messages, tools),
+        callAnthropic: (call) => callAnthropic(anthropicKey, call),
       },
       { message: body.message, conversationId: body.conversationId },
     )

@@ -15,13 +15,38 @@ import {
 // deno-lint-ignore no-explicit-any
 type Json = any
 
+/** Un appel au modèle ; `effort` n'est envoyé que pour les modèles qui l'acceptent. */
+export interface ModelCall {
+  model: string
+  effort?: string
+  system: string
+  messages: Json[]
+  tools?: Json[]
+}
+
 export interface ChatDeps {
   db: Json
   userId: string
   lang: Lang
   google: GoogleBridge | null
-  callAnthropic: (model: string, system: string, messages: Json[], tools?: Json[]) => Promise<Json>
+  callAnthropic: (call: ModelCall) => Promise<Json>
   now?: Date
+}
+
+export type ModelMode = 'economy' | 'auto' | 'balanced' | 'quality'
+export const MODEL_MODES: ModelMode[] = ['economy', 'auto', 'balanced', 'quality']
+
+interface Profile { model: string; effort?: string; price: { input: number; output: number } }
+
+export interface UsageInfo {
+  model: string
+  mode: ModelMode
+  input_tokens: number
+  output_tokens: number
+  calls: number
+  cost_usd: number
+  /** true si le modèle choisi a été refusé par l'API et que le modèle de secours a répondu */
+  used_fallback: boolean
 }
 
 export interface ChatResult {
@@ -30,6 +55,7 @@ export interface ChatResult {
   assistantMessageId: string
   actions: ActionRow[]
   model: string
+  usage: UsageInfo
   warning?: string
 }
 
@@ -42,6 +68,31 @@ export function needsSonnet(message: string): boolean {
   const text = message.toLowerCase()
   return smartKeywords.some((k) => text.includes(k)) || message.length > smartMinLength
 }
+
+/** Mode choisi par l'utilisateur (null si aucun réglage ou table absente : on garde le défaut). */
+export async function loadModelMode(db: Json, userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await db.from('agent_settings').select('model_mode').eq('user_id', userId).maybeSingle()
+    return error ? null : (data?.model_mode ?? null)
+  } catch {
+    return null
+  }
+}
+
+/** Traduit un mode en modèle. « auto » choisit selon la question ; un mode inconnu retombe sur le défaut. */
+export function resolveProfile(mode: string | null | undefined, message: string): { mode: ModelMode; profile: Profile } {
+  const m = AGENT_CONFIG.models
+  const chosen = (MODEL_MODES as string[]).includes(mode ?? '') ? (mode as ModelMode) : (m.defaultMode as ModelMode)
+  const key = chosen === 'auto' ? (needsSonnet(message) ? m.autoComplex : m.autoSimple) : chosen
+  return { mode: chosen, profile: m.modes[key as keyof typeof m.modes] }
+}
+
+export function estimateCostUsd(price: { input: number; output: number }, inputTokens: number, outputTokens: number): number {
+  return Math.round(((inputTokens * price.input + outputTokens * price.output) / 1_000_000) * 1e6) / 1e6
+}
+
+/** Le modèle lui-même est refusé (identifiant inconnu, paramètre non accepté…) : un repli a du sens. */
+const isModelRejected = (err: unknown) => /Anthropic (400|404)/.test((err as Error)?.message ?? '')
 
 export function buildSystemPrompt(now: Date, lang: Lang, financeText: string): string {
   const tz = AGENT_CONFIG.timezone
@@ -116,16 +167,42 @@ export async function handleChat(deps: ChatDeps, body: { message?: string; conve
   const ctx: ToolContext = { db, userId, lang, google: deps.google, now }
   const financeText = describeFinanceRefs(await loadFinanceRefs(ctx), lang)
   const system = buildSystemPrompt(now, lang, financeText)
-  const model = needsSonnet(message) ? AGENT_CONFIG.models.smart : AGENT_CONFIG.models.fast
+  const { mode, profile } = resolveProfile(await loadModelMode(db, userId), message)
+  let active: Profile = profile
+  let usedFallback = false
+  const usage = { input: 0, output: 0, calls: 0 }
+  const addUsage = (res: Json) => {
+    usage.calls++
+    usage.input += (res?.usage?.input_tokens ?? 0) + (res?.usage?.cache_creation_input_tokens ?? 0) + (res?.usage?.cache_read_input_tokens ?? 0)
+    usage.output += res?.usage?.output_tokens ?? 0
+  }
+  // Un seul essai de secours, uniquement au tout premier appel (sans blocs de réflexion à rejouer)
+  const callModel = async (msgs: Json[], withTools: boolean) => {
+    const call: ModelCall = { model: active.model, effort: active.effort, system, messages: msgs, tools: withTools ? TOOL_DEFINITIONS : undefined }
+    try {
+      const res = await deps.callAnthropic(call)
+      addUsage(res)
+      return res
+    } catch (err) {
+      if (usage.calls > 0 || usedFallback || !isModelRejected(err)) throw err
+      console.error(`Model ${active.model} rejected, falling back:`, (err as Error).message)
+      usedFallback = true
+      active = AGENT_CONFIG.models.fallback
+      const res = await deps.callAnthropic({ ...call, model: active.model, effort: undefined })
+      addUsage(res)
+      return res
+    }
+  }
 
   // ---- Boucle agent : chaque action est enregistrée au fil de l'eau (pour pouvoir l'annuler) ----
   const actions: ActionRow[] = []
   let text = ''
+  let stopReason: string | undefined
   let warning: string | undefined
   try {
     const out = await runAgentLoop({
       messages,
-      callModel: (msgs, withTools) => deps.callAnthropic(model, system, msgs, withTools ? TOOL_DEFINITIONS : undefined),
+      callModel,
       runTool: async (name, input) => {
         const outcome = await executeTool(name, input, ctx)
         if (!outcome.action) return outcome
@@ -150,12 +227,16 @@ export async function handleChat(deps: ChatDeps, body: { message?: string; conve
       },
     })
     text = out.text
+    stopReason = out.stopReason
   } catch (err) {
     // Rien n'a été modifié : on laisse l'erreur remonter. Sinon on garde une trace visible et annulable.
     if (actions.length === 0) throw err
     warning = (err as Error).message
     console.error('Agent failed after actions:', warning)
     text = `${lang === 'fr' ? 'Une erreur est survenue en cours de route.' : 'Something went wrong along the way.'}\n${describeDoneActions(actions, lang)}`
+  }
+  if (!text && stopReason === 'refusal') {
+    text = lang === 'fr' ? 'Je ne peux pas aider sur cette demande.' : "I can't help with that request."
   }
   if (!text) {
     text = actions.length > 0
@@ -170,8 +251,24 @@ export async function handleChat(deps: ChatDeps, body: { message?: string; conve
   await linkActions(db, userId, actions.map((a) => a.id), assistant.id)
   await db.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId).eq('user_id', userId)
 
+  // ---- Consommation : estimation enregistrée, sans jamais faire échouer la réponse ----
+  const info: UsageInfo = {
+    model: active.model, mode, input_tokens: usage.input, output_tokens: usage.output, calls: usage.calls,
+    cost_usd: estimateCostUsd(active.price, usage.input, usage.output), used_fallback: usedFallback,
+  }
+  try {
+    const { error: usageError } = await db.from('agent_usage').insert({
+      user_id: userId, conversation_id: conversationId, message_id: assistant.id, model: info.model,
+      input_tokens: info.input_tokens, output_tokens: info.output_tokens, calls: info.calls,
+      tool_calls: actions.length, cost_usd: info.cost_usd,
+    })
+    if (usageError) console.error('agent_usage not recorded:', usageError.message)
+  } catch (err) {
+    console.error('agent_usage not recorded:', (err as Error).message)
+  }
+
   return {
     message: text, conversationId: conversationId as string, assistantMessageId: assistant.id,
-    actions: actions.map((a) => ({ ...a, message_id: assistant.id })), model, warning,
+    actions: actions.map((a) => ({ ...a, message_id: assistant.id })), model: info.model, usage: info, warning,
   }
 }
