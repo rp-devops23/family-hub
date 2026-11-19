@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles, getSeasonColor } from '../lib/theme'
-import { SEASONS, DIFFICULTIES, MEAL_TYPES, PRICE_RANGES, getSeasonEmoji, getMealTypeEmoji, getPriceRangeSymbol } from '../lib/i18n'
+import { SEASONS, DIFFICULTIES, MEAL_TYPES, getSeasonEmoji, getMealTypeEmoji } from '../lib/i18n'
+import { recipePrice, formatEuro } from '../lib/price'
 import IngredientSelector from './IngredientSelector'
 
 export default function RecipeForm({ recipe, onClose }) {
   const {
-    t, getName,
+    t, getName, language,
     tags, bases, cuisines,
     createRecipe, updateRecipe, deleteRecipe,
     recipes
@@ -23,7 +24,6 @@ export default function RecipeForm({ recipe, onClose }) {
   const [cuisineId, setCuisineId] = useState(recipe?.cuisine_id || '')
   const [difficulty, setDifficulty] = useState(recipe?.difficulty || 'medium')
   const [mealType, setMealType] = useState(recipe?.meal_type || 'main')
-  const [priceRange, setPriceRange] = useState(recipe?.price_range || 'medium')
   const [prepTime, setPrepTime] = useState(recipe?.prep_time_minutes?.toString() || '')
   const [notes, setNotes] = useState(recipe?.notes || '')
   const [recipeIngredients, setRecipeIngredients] = useState(
@@ -78,7 +78,6 @@ export default function RecipeForm({ recipe, onClose }) {
       cuisine_id: cuisineId || null,
       difficulty,
       meal_type: mealType,
-      price_range: priceRange,
       prep_time_minutes: prepTime ? parseInt(prepTime, 10) : null,
       notes: notes.trim() || null
     }
@@ -249,24 +248,29 @@ export default function RecipeForm({ recipe, onClose }) {
             </div>
 
             <div style={styles.halfField}>
-              <label style={commonStyles.label}>{t('recipe.priceRange')}</label>
-              <div style={styles.chipGroupVertical}>
-                {PRICE_RANGES.map(price => (
-                  <button
-                    key={price}
-                    type="button"
-                    onClick={() => setPriceRange(price)}
-                    style={{
-                      ...styles.chipSmall,
-                      backgroundColor: priceRange === price ? colors.gold + '1A' : colors.background,
-                      color: priceRange === price ? colors.gold : colors.textSecondary,
-                      borderColor: priceRange === price ? colors.gold + '40' : 'transparent'
-                    }}
-                  >
-                    {getPriceRangeSymbol(price)} {t(`priceRange.${price}`)}
-                  </button>
-                ))}
-              </div>
+              <label style={commonStyles.label}>{t('recipe.price')}</label>
+              {(() => {
+                // Le prix est calculé par la base d'après les ingrédients : il n'est plus saisi à la main
+                const price = isEditing ? recipePrice(recipe) : null
+                return (
+                  <div style={styles.priceBox}>
+                    {!price && <span style={styles.priceHint}>{t('price.newHint')}</span>}
+                    {price?.status === 'complete' && <span style={styles.priceValue}>≈ {formatEuro(price.amount, language)}</span>}
+                    {price?.status === 'partial' && (
+                      <>
+                        <span style={styles.priceValue}>≥ {formatEuro(price.amount, language)} <span style={styles.priceTag}>{t('price.partialLabel')}</span></span>
+                        <span style={styles.priceHint}>{t('price.partialHint')} {price.missing.join(', ')}.</span>
+                      </>
+                    )}
+                    {price?.status === 'unknown' && (
+                      <>
+                        <span style={styles.priceValue}>{t('price.unknown')}</span>
+                        <span style={styles.priceHint}>{t('price.unknownHint')}</span>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </div>
 
@@ -341,6 +345,10 @@ const styles = {
   textarea: { ...commonStyles.input, padding: '10px 14px', resize: 'vertical', fontFamily: fonts.body },
   chipGroup: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
   chipGroupVertical: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  priceBox: { display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px', backgroundColor: colors.background, borderRadius: borderRadius.md },
+  priceValue: { fontSize: fontSizes.lg, fontWeight: 700, color: colors.textPrimary },
+  priceTag: { fontSize: fontSizes.xs, fontWeight: 600, color: colors.textMuted },
+  priceHint: { fontSize: fontSizes.xs, color: colors.textSecondary, lineHeight: 1.4 },
   chip: { padding: '6px 12px', borderRadius: borderRadius.full, border: '1.5px solid transparent', fontSize: fontSizes.sm, fontFamily: fonts.body, cursor: 'pointer', transition: 'all 0.2s ease', fontWeight: 500 },
   chipSmall: { padding: '6px 12px', borderRadius: borderRadius.md, border: '1.5px solid transparent', fontSize: fontSizes.sm, fontFamily: fonts.body, cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s ease', fontWeight: 500 },
   errorText: { fontSize: fontSizes.sm, color: colors.error, marginTop: spacing.xs },

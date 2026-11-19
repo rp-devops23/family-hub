@@ -4,10 +4,11 @@ import { colors, fonts, shadows, primaryRgb } from '../lib/theme'
 import RecipeCard from './RecipeCard'
 import RecipeForm from './RecipeForm'
 import FilterPanel from './FilterPanel'
+import { priceFilter } from '../lib/price'
 
 const EMPTY_FILTERS = {
   seasons: [], tags: [], bases: [], cuisines: [],
-  difficulties: [], mealTypes: [], priceRanges: []
+  difficulties: [], mealTypes: [], maxPrice: ''
 }
 
 export default function RecipesPage() {
@@ -17,8 +18,10 @@ export default function RecipesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState(null)
 
-  const filteredRecipes = useMemo(() => {
-    return recipes.filter(recipe => {
+  // Recettes filtrées + nombre de recettes écartées parce qu'elles n'ont aucun prix connu (filtre « prix max »)
+  const { filteredRecipes, hiddenNoPrice } = useMemo(() => {
+    let hiddenNoPrice = 0
+    const filteredRecipes = recipes.filter(recipe => {
       if (searchQuery && !recipe.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
       if (filters.seasons.length > 0 && filters.seasons.length < 4) {
         const recipeSeasons = recipe.seasons || []
@@ -32,9 +35,12 @@ export default function RecipesPage() {
       if (filters.cuisines.length > 0 && (!recipe.cuisine_id || !filters.cuisines.includes(recipe.cuisine_id))) return false
       if (filters.difficulties.length > 0 && !filters.difficulties.includes(recipe.difficulty)) return false
       if (filters.mealTypes.length > 0 && !filters.mealTypes.includes(recipe.meal_type || 'main')) return false
-      if (filters.priceRanges.length > 0 && !filters.priceRanges.includes(recipe.price_range || 'medium')) return false
+      const price = priceFilter(recipe, filters.maxPrice)
+      if (price === 'unknown') { hiddenNoPrice++; return false }
+      if (price === 'too-expensive') return false
       return true
     })
+    return { filteredRecipes, hiddenNoPrice }
   }, [recipes, searchQuery, filters])
 
   const handleAddRecipe = () => { setEditingRecipe(null); setShowForm(true) }
@@ -65,6 +71,7 @@ export default function RecipesPage() {
       {(searchQuery || hasActiveFilters) && (
         <div style={styles.resultsCount}>
           {filteredRecipes.length} / {recipes.length} {t('nav.recipes').toLowerCase()}
+          {hiddenNoPrice > 0 && <div>{t('filter.maxPrice.hidden', { count: hiddenNoPrice })}</div>}
         </div>
       )}
 

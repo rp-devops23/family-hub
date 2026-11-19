@@ -239,7 +239,8 @@ export const TOOL_DEFINITIONS = [
   {
     name: 'search_recipes',
     description:
-      'Search the family recipes. Returns ingredients, prep time, difficulty, tags. Use it to suggest what to cook, e.g. with a given ingredient.',
+      'Search the family recipes. Returns ingredients, prep time, difficulty, tags and cost. Use it to suggest what to cook, e.g. with a given ingredient. ' +
+      'cost_eur is computed from ingredient prices and quantities: it is the exact cost only when cost_complete is true, otherwise a minimum (some ingredients have no price or quantity yet), and null when unknown.',
     input_schema: {
       type: 'object',
       properties: {
@@ -247,6 +248,7 @@ export const TOOL_DEFINITIONS = [
         ingredient: { type: 'string', description: 'Only recipes that use this ingredient' },
         meal_type: { type: 'string', enum: ['appetizer', 'starter', 'main', 'side', 'dessert'] },
         max_prep_minutes: { type: 'integer' },
+        max_cost_eur: { type: 'number', description: 'Only recipes whose known cost (or known minimum) is at most this amount. Recipes with no known cost are left out.' },
       },
     },
   },
@@ -545,16 +547,22 @@ const getBudgets: Executor = async (_input, ctx) => {
 
 const searchRecipes: Executor = async (input, ctx) => {
   const [recipesRes, ingRes, tagsRes] = await Promise.all([
-    ctx.db.from('recipes').select('id, name, meal_type, difficulty, price_range, prep_time_minutes, seasons').eq('user_id', ctx.userId),
+    ctx.db.from('recipes').select('id, name, meal_type, difficulty, prep_time_minutes, seasons').eq('user_id', ctx.userId),
     ctx.db.from('ingredients').select('id, name_fr, name_en').eq('user_id', ctx.userId),
     ctx.db.from('tags').select('id, name_fr').eq('user_id', ctx.userId),
   ])
   const recipes = check(recipesRes) ?? []
   const recipeIds = recipes.map((r: { id: string }) => r.id)
-  const [riRows, rtRows] = await Promise.all([
+  const [riRows, rtRows, costRows] = await Promise.all([
     selectIn(ctx, 'recipe_ingredients', 'recipe_id, ingredient_id', 'recipe_id', recipeIds),
     selectIn(ctx, 'recipe_tags', 'recipe_id, tag_id', 'recipe_id', recipeIds),
+    // Coût calculé par la base (vue recipe_costs) ; tolérant si la vue est indisponible
+    selectIn(ctx, 'recipe_costs', 'recipe_id, known_cost, missing_count', 'recipe_id', recipeIds).catch(() => []),
   ])
+  const costOf = new Map<string, { cost: number | null; complete: boolean }>()
+  for (const c of costRows) {
+    costOf.set(c.recipe_id, { cost: c.known_cost == null ? null : Number(c.known_cost), complete: Number(c.missing_count) === 0 })
+  }
   const ingName = new Map((check(ingRes) ?? []).map((i: { id: string; name_fr: string }) => [i.id, i.name_fr]))
   const tagName = new Map((check(tagsRes) ?? []).map((t: { id: string; name_fr: string }) => [t.id, t.name_fr]))
   const ownRecipe = new Set(recipes.map((r: { id: string }) => r.id))
@@ -571,17 +579,20 @@ const searchRecipes: Executor = async (input, ctx) => {
 
   const q = norm(input.query), ing = norm(input.ingredient)
   const maxPrep = Number(input.max_prep_minutes) || null
+  const maxCost = input.max_cost_eur == null || input.max_cost_eur === '' ? null : Number(input.max_cost_eur)
   const matches = recipes.filter((r: { id: string; name: string; meal_type: string; prep_time_minutes: number | null }) =>
     (!q || norm(r.name).includes(q)) &&
     (!ing || (ingredientsOf.get(r.id) ?? []).some((n) => norm(n).includes(ing) || singular(norm(n)) === singular(ing))) &&
     (!input.meal_type || r.meal_type === input.meal_type) &&
-    (!maxPrep || (r.prep_time_minutes != null && r.prep_time_minutes <= maxPrep))
+    (!maxPrep || (r.prep_time_minutes != null && r.prep_time_minutes <= maxPrep)) &&
+    (maxCost == null || !Number.isFinite(maxCost) || (costOf.get(r.id)?.cost != null && (costOf.get(r.id)?.cost as number) <= maxCost))
   )
   return {
     result: {
       total_matches: matches.length,
-      recipes: matches.slice(0, AGENT_CONFIG.tools.recipesLimit).map((r: { id: string; name: string; meal_type: string; difficulty: string; price_range: string; prep_time_minutes: number | null; seasons: string[] }) => ({
-        id: r.id, name: r.name, meal_type: r.meal_type, difficulty: r.difficulty, price_range: r.price_range,
+      recipes: matches.slice(0, AGENT_CONFIG.tools.recipesLimit).map((r: { id: string; name: string; meal_type: string; difficulty: string; prep_time_minutes: number | null; seasons: string[] }) => ({
+        id: r.id, name: r.name, meal_type: r.meal_type, difficulty: r.difficulty,
+        cost_eur: costOf.get(r.id)?.cost ?? null, cost_complete: costOf.get(r.id)?.complete ?? false,
         prep_time_minutes: r.prep_time_minutes, seasons: r.seasons,
         ingredients: ingredientsOf.get(r.id) ?? [], tags: tagsOf.get(r.id) ?? [],
       })),
