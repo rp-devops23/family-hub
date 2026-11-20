@@ -19,7 +19,7 @@ const SECTION = {
 // Chaque section est une application à part entière ; seule la section « recettes » a des réglages
 // (ingrédients, catégories, étiquettes) et elle propose un accès direct aux deux autres.
 export default function Layout({ section = 'recipes', onHome }) {
-  const { language, toggleLanguage, signOut, currentTab, setCurrentTab, t } = useApp()
+  const { language, signOut, currentTab, setCurrentTab, t } = useApp()
   const info = SECTION[section] ?? SECTION.recipes
   const inSettings = section === 'recipes' && currentTab === 'settings'
   const [showStats, setShowStats] = useState(false)
@@ -52,9 +52,6 @@ export default function Layout({ section = 'recipes', onHome }) {
         </div>
 
         <div style={styles.actions}>
-          <button onClick={toggleLanguage} style={styles.langBtn}>
-            {language === 'fr' ? 'EN' : 'FR'}
-          </button>
           {section === 'calendar' && (
             <button onClick={() => setShowStats(v => !v)} style={{ ...styles.actionBtn, ...(inStats ? styles.actionBtnActive : {}) }} title={language === 'fr' ? 'Statistiques' : 'Statistics'} aria-label={language === 'fr' ? 'Statistiques' : 'Statistics'}>
               📊
@@ -115,11 +112,6 @@ const styles = {
     WebkitTextFillColor: 'transparent', color: colors.forest
   },
   actions: { display: 'flex', alignItems: 'center', gap: '6px' },
-  langBtn: {
-    padding: '6px 14px', border: `1.5px solid ${colors.warmGray}`, borderRadius: '10px',
-    background: 'white', cursor: 'pointer', fontSize: '13px', fontFamily: FONT,
-    fontWeight: 600, color: colors.textSecondary, transition: 'all 0.2s ease'
-  },
   actionBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: '36px', height: '36px',
