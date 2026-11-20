@@ -261,6 +261,24 @@ export const TOOL_DEFINITIONS = [
       required: ['start_date', 'end_date'],
     },
   },
+  {
+    name: 'get_meal_stats',
+    description:
+      'Statistics on the meals planned in the calendar: most frequent dishes, number of meals and estimated food cost per period, dishes never planned. ' +
+      'Use it for questions like "which dishes do we eat most", "per season / per year", "how much did the dishes of winter vs summer cost". ' +
+      'group_by splits the period: season (winter = Dec-Feb, spring = Mar-May, summer = Jun-Aug, autumn = Sep-Nov), year, month, or none. ' +
+      'Costs are the recipe cost for 4 people from ingredient prices: cost_eur_known only adds the meals whose cost is known, and meals_without_cost counts the others, so say it is a minimum when that count is above 0.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        start_date: dateProp('Start (default: first planned meal)'),
+        end_date: dateProp('End (default: last planned meal)'),
+        group_by: { type: 'string', enum: ['season', 'year', 'month', 'none'], description: 'Default: season' },
+        meal_type: { type: 'string', enum: ['appetizer', 'starter', 'main', 'side', 'dessert'], description: 'Only meals of this type (default: all)' },
+        top: { type: 'integer', description: 'Most frequent dishes listed per period (default 5, max 15)' },
+      },
+    },
+  },
   // ---- Courses : lecture / actions -----------------------------------------
   {
     name: 'get_shopping_list',
@@ -619,6 +637,98 @@ const getMealPlan: Executor = async (input, ctx) => {
   }
 }
 
+// ---- Statistiques des repas -------------------------------------------------
+
+export interface MealStatsInput {
+  plans: { recipe_id: string; planned_date: string }[]
+  recipes: { id: string; name: string; meal_type: string | null }[]
+  costs: Map<string, { cost: number | null; complete: boolean }>
+  groupBy: 'season' | 'year' | 'month' | 'none'
+  mealType?: string | null
+  top: number
+}
+
+const SEASONS_FR = { winter: 'Hiver', spring: 'Printemps', summer: 'Été', autumn: 'Automne' } as const
+
+/** Saison météorologique d'une date ; l'hiver de décembre 2025 est « Hiver 2025-26 ». */
+export function seasonKey(isoDate: string): { key: string; label: string } {
+  const year = Number(isoDate.slice(0, 4)), month = Number(isoDate.slice(5, 7))
+  const season = month === 12 || month <= 2 ? 'winter' : month <= 5 ? 'spring' : month <= 8 ? 'summer' : 'autumn'
+  if (season === 'winter') {
+    const start = month === 12 ? year : year - 1
+    return { key: `${start}-0-winter`, label: `${SEASONS_FR.winter} ${start}-${String(start + 1).slice(2)}` }
+  }
+  const order = { spring: 1, summer: 2, autumn: 3 }[season]
+  return { key: `${year}-${order}-${season}`, label: `${SEASONS_FR[season]} ${year}` }
+}
+
+export function buildMealStats(input: MealStatsInput) {
+  const recipeById = new Map(input.recipes.map((r) => [r.id, r]))
+  const plans = input.plans.filter((p) => recipeById.has(p.recipe_id) && (!input.mealType || recipeById.get(p.recipe_id)?.meal_type === input.mealType))
+  const keyOf = (date: string) =>
+    input.groupBy === 'season' ? seasonKey(date)
+    : input.groupBy === 'year' ? { key: date.slice(0, 4), label: date.slice(0, 4) }
+    : input.groupBy === 'month' ? { key: date.slice(0, 7), label: date.slice(0, 7) }
+    : { key: 'all', label: 'Total' }
+
+  const topOf = (list: typeof plans) => {
+    const counts = new Map<string, number>()
+    for (const p of list) counts.set(p.recipe_id, (counts.get(p.recipe_id) ?? 0) + 1)
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || String(recipeById.get(a[0])?.name).localeCompare(String(recipeById.get(b[0])?.name)))
+      .slice(0, input.top).map(([id, times]) => ({ name: recipeById.get(id)?.name, times }))
+  }
+  const summarize = (list: typeof plans) => {
+    let cost = 0, without = 0
+    for (const p of list) {
+      const c = input.costs.get(p.recipe_id)
+      if (c?.cost == null) without++; else { cost += c.cost; if (!c.complete) without++ }
+    }
+    return {
+      meals: list.length,
+      distinct_dishes: new Set(list.map((p) => p.recipe_id)).size,
+      cost_eur_known: Math.round(cost * 100) / 100,
+      meals_without_cost: without,
+      top_dishes: topOf(list),
+    }
+  }
+
+  const groups = new Map<string, { label: string; list: typeof plans }>()
+  for (const p of plans) {
+    const k = keyOf(p.planned_date)
+    if (!groups.has(k.key)) groups.set(k.key, { label: k.label, list: [] })
+    groups.get(k.key)!.list.push(p)
+  }
+  const periods = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, g]) => ({ period: g.label, ...summarize(g.list) }))
+
+  const planned = new Set(plans.map((p) => p.recipe_id))
+  const never = input.recipes.filter((r) => !planned.has(r.id) && (!input.mealType || r.meal_type === input.mealType))
+  return {
+    total_meals: plans.length,
+    periods,
+    never_planned: { count: never.length, examples: never.slice(0, 10).map((r) => r.name) },
+  }
+}
+
+const getMealStats: Executor = async (input, ctx) => {
+  const groupBy = ['season', 'year', 'month', 'none'].includes(String(input.group_by)) ? input.group_by as MealStatsInput['groupBy'] : 'season'
+  const top = Math.min(15, Math.max(1, Number(input.top) || 5))
+  let q = ctx.db.from('meal_plans').select('recipe_id, planned_date').eq('user_id', ctx.userId)
+  if (isDate(input.start_date)) q = q.gte('planned_date', input.start_date)
+  if (isDate(input.end_date)) q = q.lte('planned_date', input.end_date)
+  const [plansRes, recipesRes] = await Promise.all([
+    q.order('planned_date', { ascending: true }),
+    ctx.db.from('recipes').select('id, name, meal_type').eq('user_id', ctx.userId),
+  ])
+  const recipes = check(recipesRes) ?? []
+  const costRows = await selectIn(ctx, 'recipe_costs', 'recipe_id, known_cost, missing_count', 'recipe_id', recipes.map((r: { id: string }) => r.id)).catch(() => [])
+  const costs = new Map<string, { cost: number | null; complete: boolean }>()
+  for (const c of costRows) costs.set(c.recipe_id, { cost: c.known_cost == null ? null : Number(c.known_cost), complete: Number(c.missing_count) === 0 })
+  return {
+    result: buildMealStats({ plans: check(plansRes) ?? [], recipes, costs, groupBy, mealType: input.meal_type ? String(input.meal_type) : null, top }),
+  }
+}
+
 // ---- Courses ----------------------------------------------------------------
 
 const itemName = (item: { name?: string | null; custom_name?: string | null }, ing?: { name_fr?: string } | null) =>
@@ -862,6 +972,7 @@ const EXECUTORS: Record<string, Executor> = {
   get_budgets: getBudgets,
   search_recipes: searchRecipes,
   get_meal_plan: getMealPlan,
+  get_meal_stats: getMealStats,
   get_shopping_list: getShoppingList,
   add_shopping_items: addShoppingItems,
   check_shopping_items: checkShoppingItems,

@@ -7,26 +7,27 @@ import { colors, primaryRgb } from '../lib/theme'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 
-export default function Layout({ onHome }) {
-  const { t, language, toggleLanguage, signOut, currentTab, setCurrentTab, shoppingItems } = useApp()
+const SECTION = {
+  recipes: { tab: 'recipes', fr: 'Recettes', en: 'Recipes', icon: '🍳' },
+  calendar: { tab: 'calendar', fr: 'Repas', en: 'Meals', icon: '📅' },
+  groceries: { tab: 'shopping', fr: 'Courses', en: 'Groceries', icon: '🛒' },
+}
 
-  const uncheckedCount = shoppingItems.filter(item => !item.checked).length
+// Chaque section est une application à part entière ; seule la section « recettes » a des réglages
+// (ingrédients, catégories, étiquettes) et elle propose un accès direct aux deux autres.
+export default function Layout({ section = 'recipes', onHome, onOpenApp }) {
+  const { language, toggleLanguage, signOut, currentTab, setCurrentTab, t } = useApp()
+  const info = SECTION[section] ?? SECTION.recipes
+  const inSettings = section === 'recipes' && currentTab === 'settings'
 
   const renderPage = () => {
-    switch (currentTab) {
-      case 'recipes': return <RecipesPage />
+    if (inSettings) return <SettingsPage onHome={onHome} />
+    switch (info.tab) {
       case 'calendar': return <CalendarPage />
       case 'shopping': return <ShoppingListPage />
-      case 'settings': return <SettingsPage onHome={onHome} />
       default: return <RecipesPage />
     }
   }
-
-  const tabs = [
-    { id: 'recipes', label: t('nav.recipes'), icon: '🍳' },
-    { id: 'calendar', label: t('nav.calendar'), icon: '📅' },
-    { id: 'shopping', label: t('nav.shopping'), icon: '🛒', badge: uncheckedCount },
-  ]
 
   return (
     <div style={styles.container}>
@@ -37,16 +38,19 @@ export default function Layout({ onHome }) {
               🏠
             </button>
           )}
-          <span style={styles.logoText}>{language === 'fr' ? 'Recettes' : 'Recipes'}</span>
+          <span style={{ fontSize: '21px' }}>{info.icon}</span>
+          <span style={styles.logoText}>{language === 'fr' ? info.fr : info.en}</span>
         </div>
 
         <div style={styles.actions}>
           <button onClick={toggleLanguage} style={styles.langBtn}>
             {language === 'fr' ? 'EN' : 'FR'}
           </button>
-          <button onClick={() => setCurrentTab('settings')} style={{ ...styles.actionBtn, ...(currentTab === 'settings' ? styles.actionBtnActive : {}) }} title={t('nav.settings')}>
-            ⚙️
-          </button>
+          {section === 'recipes' && (
+            <button onClick={() => setCurrentTab(inSettings ? 'recipes' : 'settings')} style={{ ...styles.actionBtn, ...(inSettings ? styles.actionBtnActive : {}) }} title={t('nav.settings')}>
+              ⚙️
+            </button>
+          )}
           <button onClick={signOut} style={styles.actionBtn} title={language === 'fr' ? 'Se déconnecter' : 'Sign out'}>
             🚪
           </button>
@@ -54,33 +58,28 @@ export default function Layout({ onHome }) {
       </header>
 
       <main style={styles.main}>
-        <div key={currentTab} className="rc-page">
+        <div key={`${section}-${currentTab}`} className="rc-page">
           {renderPage()}
         </div>
       </main>
 
-      <nav style={styles.nav}>
-        <div style={styles.navInner}>
-          {tabs.map(tab => {
-            const isActive = currentTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setCurrentTab(tab.id)}
-                style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
-              >
-                <span style={{ ...styles.icon, transform: isActive ? 'scale(1.15)' : 'scale(1)' }}>
-                  {tab.icon}
-                  {tab.badge > 0 && <span style={styles.badge}>{tab.badge > 9 ? '9+' : tab.badge}</span>}
-                </span>
-                <span style={{ ...styles.label, color: isActive ? colors.forest : colors.textMuted, fontWeight: isActive ? 700 : 500 }}>
-                  {tab.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </nav>
+      {onOpenApp && !inSettings && (
+        <nav style={styles.nav} aria-label={language === 'fr' ? 'Autres applications' : 'Other apps'}>
+          <div style={styles.navInner}>
+            {Object.entries(SECTION).map(([id, sec]) => {
+              const isActive = id === section
+              return (
+                <button key={id} onClick={() => !isActive && onOpenApp(id)} style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}>
+                  <span style={{ ...styles.icon, transform: isActive ? 'scale(1.15)' : 'scale(1)' }}>{sec.icon}</span>
+                  <span style={{ ...styles.label, color: isActive ? colors.forest : colors.textMuted, fontWeight: isActive ? 700 : 500 }}>
+                    {language === 'fr' ? sec.fr : sec.en}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   )
 }
