@@ -97,13 +97,14 @@ const PREFS_KEY = 'familyhub.homePrefs';
 const DEFAULT_HIDDEN = ['corvees', 'travaux', 'holiday'];
 
 export function getHomePrefs() {
-  const defaults = { hidden: DEFAULT_HIDDEN, openLast: false };
+  const defaults = { hidden: DEFAULT_HIDDEN, openLast: false, order: [] };
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null');
     if (!raw || typeof raw !== 'object') return defaults;
     return {
       hidden: Array.isArray(raw.hidden) ? raw.hidden.filter(isAppId) : defaults.hidden,
       openLast: raw.openLast === true,
+      order: Array.isArray(raw.order) ? raw.order.filter(isAppId) : [],
     };
   } catch {
     return defaults;
@@ -120,4 +121,19 @@ export function saveHomePrefs(prefs) {
 export function getLastVisibleApp() {
   const { hidden } = getHomePrefs();
   return getRecentApps().find(id => !hidden.includes(id)) || null;
+}
+
+// Applique l'ordre choisi par l'utilisateur ; les apps absentes de l'ordre gardent leur place d'origine, à la suite.
+export function sortApps(apps, order = []) {
+  const rank = (id) => { const i = order.indexOf(id); return i === -1 ? Infinity : i; };
+  return apps.map((app, index) => ({ app, index })).sort((a, b) => rank(a.app.id) - rank(b.app.id) || a.index - b.index).map(x => x.app);
+}
+
+// Échange une app avec sa voisine dans la liste affichée (direction -1 = vers le haut, 1 = vers le bas).
+export function moveApp(apps, order, id, direction) {
+  const ids = sortApps(apps, order).map(a => a.id);
+  const i = ids.indexOf(id), j = i + direction;
+  if (i === -1 || j < 0 || j >= ids.length) return order;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  return ids;
 }

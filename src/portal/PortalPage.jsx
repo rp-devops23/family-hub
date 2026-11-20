@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { APPS, ASSISTANT, GROUPS, getApp, getRecentApps, getHomePrefs, saveHomePrefs } from './apps';
+import { APPS, ASSISTANT, GROUPS, getHomePrefs, saveHomePrefs, sortApps, moveApp } from './apps';
 
 // ============================================================================
 // PORTAL PAGE - Family hub home screen
@@ -78,10 +78,6 @@ export default function PortalPage({ onSelectApp }) {
   });
 
   const isVisible = (app) => !prefs.hidden.includes(app.id);
-  const recents = useMemo(
-    () => getRecentApps().map(getApp).filter(app => app && !prefs.hidden.includes(app.id)),
-    [prefs.hidden]
-  );
   const title = (app) => (language === 'fr' ? app.titleFr : app.titleEn);
   const desc = (app) => (language === 'fr' ? app.descFr : app.descEn);
 
@@ -113,11 +109,19 @@ export default function PortalPage({ onSelectApp }) {
           <section className="p-in" style={styles.section}>
             <h2 style={styles.sectionTitle}>{t('Applications affichées', 'Visible apps')}</h2>
             <div style={styles.list}>
-              {APPS.map(app => (
+              {sortApps(APPS, prefs.order).map((app, i, all) => (
                 <div key={app.id} style={styles.editRow}>
                   <span style={{ ...styles.editIcon, backgroundColor: app.bg }}>{app.icon}</span>
                   <span style={styles.cardText}>
                     <span style={styles.cardTitle}>{title(app)}</span>
+                  </span>
+                  <span style={styles.moveBtns}>
+                    <button type="button" style={{ ...styles.moveBtn, opacity: i === 0 ? 0.3 : 1 }} disabled={i === 0}
+                      onClick={() => updatePrefs({ ...prefs, order: moveApp(APPS, prefs.order, app.id, -1) })}
+                      aria-label={t('Monter', 'Move up')}>↑</button>
+                    <button type="button" style={{ ...styles.moveBtn, opacity: i === all.length - 1 ? 0.3 : 1 }} disabled={i === all.length - 1}
+                      onClick={() => updatePrefs({ ...prefs, order: moveApp(APPS, prefs.order, app.id, 1) })}
+                      aria-label={t('Descendre', 'Move down')}>↓</button>
                   </span>
                   <Switch on={isVisible(app)} onChange={() => toggleApp(app.id)} label={title(app)} />
                 </div>
@@ -170,37 +174,18 @@ export default function PortalPage({ onSelectApp }) {
           </button>
         )}
 
-        {/* Reprise rapide */}
-        {recents.length > 0 && (
-          <section className="p-in" style={{ ...styles.section, animationDelay: '60ms' }}>
-            <h2 style={styles.sectionTitle}>{t('Reprendre', 'Pick up where you left off')}</h2>
-            <div style={styles.chips}>
-              {recents.map(app => (
-                <button key={app.id} onClick={() => onSelectApp(app.id)} style={styles.chip}>
-                  <span style={{ ...styles.chipIcon, backgroundColor: app.bg }}>{app.icon}</span>
-                  <span style={styles.chipLabel}>{title(app)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
         {/* Applications par domaine */}
         {GROUPS.map((group, gi) => {
-          const apps = APPS.filter(a => a.group === group.id && isVisible(a));
+          const apps = sortApps(APPS, prefs.order).filter(a => a.group === group.id && isVisible(a));
           if (apps.length === 0) return null;
           return (
             <section key={group.id} className="p-in" style={{ ...styles.section, animationDelay: `${120 + gi * 60}ms` }}>
               <h2 style={styles.sectionTitle}>{language === 'fr' ? group.titleFr : group.titleEn}</h2>
-              <div style={styles.list}>
+              <div style={styles.grid}>
                 {apps.map(app => (
-                  <button key={app.id} className="p-card" onClick={() => onSelectApp(app.id)} style={styles.card}>
-                    <span style={{ ...styles.cardIcon, backgroundColor: app.bg }}>{app.icon}</span>
-                    <span style={styles.cardText}>
-                      <span style={styles.cardTitle}>{title(app)}</span>
-                      <span style={styles.cardDesc}>{desc(app)}</span>
-                    </span>
-                    <span style={{ ...styles.chevron, color: app.color }} aria-hidden="true">›</span>
+                  <button key={app.id} className="p-card" onClick={() => onSelectApp(app.id)} style={styles.tile} aria-label={`${title(app)} — ${desc(app)}`}>
+                    <span style={{ ...styles.tileIcon, backgroundColor: app.bg }}>{app.icon}</span>
+                    <span style={styles.tileTitle}>{title(app)}</span>
                   </button>
                 ))}
               </div>
@@ -271,6 +256,16 @@ const styles = {
   chipLabel: { fontSize: '14px', fontWeight: 700, color: INK },
 
   list: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' },
+  tile: {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px',
+    minHeight: '112px', padding: '14px', border: '1px solid rgba(91,91,214,.06)', borderRadius: '20px', background: 'white',
+    boxShadow: '0 1px 2px rgba(28,27,46,.04), 0 2px 8px rgba(28,27,46,.04)', cursor: 'pointer', textAlign: 'left',
+  },
+  tileIcon: { width: '52px', height: '52px', borderRadius: '16px', fontSize: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  tileTitle: { fontSize: '16px', fontWeight: 700, color: INK, lineHeight: 1.2 },
+  moveBtns: { display: 'flex', gap: '6px', flexShrink: 0 },
+  moveBtn: { width: '36px', height: '36px', border: `1.5px solid ${LINE}`, borderRadius: '10px', background: 'white', fontSize: '16px', fontWeight: 700, color: MUTED, cursor: 'pointer', padding: 0 },
   card: {
     width: '100%', display: 'flex', alignItems: 'center', gap: '14px', padding: '14px',
     border: '1px solid rgba(91,91,214,.06)', borderRadius: '18px', background: 'white',
