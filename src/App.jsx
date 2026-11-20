@@ -19,6 +19,9 @@ import './App.css';
 // Forme : #/<app> ou #/<app>/<onglet> (ex. #/recipes/shopping pour la liste de courses)
 function routeFromHash() {
   const [id, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
+  // Anciens liens (#/recipes/shopping, #/recipes/calendar) : l'app Recettes a été scindée en trois
+  if (id === 'recipes' && tab === 'shopping') return { app: 'groceries', tab: null };
+  if (id === 'recipes' && tab === 'calendar') return { app: 'calendar', tab: null };
   return isAppId(id) ? { app: id, tab: tab || null } : { app: null, tab: null };
 }
 
@@ -83,8 +86,9 @@ function AppInner() {
     );
   }
 
-  if (activeApp === 'recipes') {
-    return <RecipeApp onHome={goHome} initialTab={route.tab} />;
+  if (activeApp === 'recipes' || activeApp === 'calendar' || activeApp === 'groceries') {
+    // Trois applications distinctes qui partagent la même couche de données (RecipeProvider)
+    return <RecipeApp key={activeApp} section={activeApp} onHome={goHome} onOpenApp={openApp} initialTab={route.tab} />;
   }
 
   if (activeApp === 'agent') {

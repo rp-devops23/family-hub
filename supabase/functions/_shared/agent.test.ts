@@ -644,3 +644,31 @@ Deno.test('réglages: si la colonne active_model_id manque (migration pas appliq
   await chat(db, model.fn)
   assert.equal(model.calls[0].model, 'claude-sonnet-5-5')
 })
+
+Deno.test('get_meal_stats : saisons, années, plats les plus fréquents, coûts partiels, jamais planifiés, isolation', async () => {
+  const { ctx, db } = setup()
+  db.tables.meal_plans = [
+    { id: 'm1', user_id: ME, recipe_id: 'r-pat1', planned_date: '2025-12-20' }, // hiver 2025-26
+    { id: 'm2', user_id: ME, recipe_id: 'r-pat1', planned_date: '2026-01-10' }, // même hiver
+    { id: 'm3', user_id: ME, recipe_id: 'r-pat2', planned_date: '2026-02-01' }, // même hiver, coût partiel
+    { id: 'm4', user_id: ME, recipe_id: 'r-pat1', planned_date: '2026-07-04' }, // été 2026
+    { id: 'mo', user_id: OTHER, recipe_id: 'r-other', planned_date: '2026-07-05' }, // autre utilisateur
+  ]
+  const bySeason = (await executeTool('get_meal_stats', { group_by: 'season' }, ctx)).result as any
+  assert.equal(bySeason.total_meals, 4)
+  assert.deepEqual(bySeason.periods.map((p: any) => [p.period, p.meals]), [['Hiver 2025-26', 3], ['Été 2026', 1]])
+  const winter = bySeason.periods[0]
+  assert.equal(winter.distinct_dishes, 2)
+  assert.deepEqual(winter.top_dishes[0], { name: 'Pâtes tomate', times: 2 })
+  assert.equal(winter.cost_eur_known, 8.4 * 2 + 5.1) // 21.9
+  assert.equal(winter.meals_without_cost, 1) // la carbonara a un coût incomplet
+  assert.equal(bySeason.never_planned.count, 1) // Lasagnes
+  assert.deepEqual(bySeason.never_planned.examples, ['Lasagnes'])
+
+  const byYear = (await executeTool('get_meal_stats', { group_by: 'year' }, ctx)).result as any
+  assert.deepEqual(byYear.periods.map((p: any) => [p.period, p.meals]), [['2025', 1], ['2026', 3]])
+
+  const none = (await executeTool('get_meal_stats', { group_by: 'none', start_date: '2026-01-01', end_date: '2026-03-01' }, ctx)).result as any
+  assert.equal(none.total_meals, 2)
+  assert.equal(none.periods.length, 1)
+})

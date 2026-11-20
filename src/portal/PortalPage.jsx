@@ -151,7 +151,7 @@ export default function PortalPage({ onSelectApp }) {
         {/* Accès rapide : liste de courses */}
         {!editing && (
           <button
-            className="p-in p-card" onClick={() => onSelectApp('recipes', 'shopping')}
+            className="p-in p-card" onClick={() => onSelectApp('groceries')}
             style={{ ...styles.quick, animationDelay: '30ms' }}
           >
             <span style={styles.quickIcon}>🛒</span>

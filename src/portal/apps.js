@@ -19,15 +19,27 @@ export const GROUPS = [
 
 export const APPS = [
   {
-    id: 'recipes', group: 'daily', icon: '🍽️',
+    id: 'recipes', group: 'daily', icon: '🍳',
     titleFr: 'Recettes', titleEn: 'Recipes',
-    descFr: 'Recettes, planning des repas & courses', descEn: 'Recipes, meal planning & groceries',
+    descFr: 'Votre livre de recettes, prix & filtres', descEn: 'Your recipe book, prices & filters',
     color: '#5B5BD6', bg: '#EEEEFC',
   },
   {
+    id: 'calendar', group: 'daily', icon: '📅',
+    titleFr: 'Repas', titleEn: 'Meals',
+    descFr: 'Calendrier des repas de la semaine', descEn: 'Weekly meal calendar',
+    color: '#0E9F8E', bg: '#E6F7F4',
+  },
+  {
+    id: 'groceries', group: 'daily', icon: '🛒',
+    titleFr: 'Courses', titleEn: 'Groceries',
+    descFr: 'Liste de courses par rayon', descEn: 'Shopping list by aisle',
+    color: '#F59E0B', bg: '#FEF6E4',
+  },
+  {
     id: 'shopping', group: 'daily', icon: '🛍️',
-    titleFr: 'Shopping', titleEn: 'Shopping',
-    descFr: 'Vêtements, accessoires & cadeaux', descEn: 'Clothing, accessories & gifts',
+    titleFr: 'Cadeaux & vêtements', titleEn: 'Gifts & clothes',
+    descFr: 'Planificateur de cadeaux, vêtements à acheter', descEn: 'Gift planner, clothes to buy',
     color: '#E5484D', bg: '#FEEEEE',
   },
   {
