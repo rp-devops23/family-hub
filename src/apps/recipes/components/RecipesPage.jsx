@@ -4,6 +4,7 @@ import { colors, fonts, shadows, primaryRgb } from '../lib/theme'
 import RecipeCard from './RecipeCard'
 import RecipeForm from './RecipeForm'
 import FilterPanel from './FilterPanel'
+import FullPage from './FullPage'
 import { priceFilter } from '../lib/price'
 
 const EMPTY_FILTERS = {
@@ -93,7 +94,7 @@ export default function RecipesPage() {
         <span style={{ fontSize: '26px', lineHeight: 1, fontWeight: 300 }}>+</span>
       </button>
 
-      {showForm && <RecipeForm recipe={editingRecipe} onClose={handleCloseForm} />}
+      {showForm && <FullPage><RecipeForm recipe={editingRecipe} onClose={handleCloseForm} /></FullPage>}
     </div>
   )
 }
@@ -122,7 +123,7 @@ const styles = {
   empty: { backgroundColor: 'white', borderRadius: '16px', padding: '48px 20px', textAlign: 'center', boxShadow: shadows.sm },
   emptyText: { fontSize: '15px', color: colors.textMuted, margin: 0 },
   fab: {
-    position: 'fixed', bottom: '100px', right: 'max(20px, calc(50% - 280px))',
+    position: 'fixed', bottom: '24px', right: 'max(20px, calc(50% - 280px))',
     width: '56px', height: '56px', borderRadius: '18px',
     backgroundColor: colors.forest, backgroundImage: `linear-gradient(135deg, ${colors.forestLight}, ${colors.forest})`,
     color: 'white', border: 'none',

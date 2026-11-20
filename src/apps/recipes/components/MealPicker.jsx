@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { format } from 'date-fns'
 import { fr, enUS } from 'date-fns/locale'
-import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, commonStyles } from '../lib/theme'
 
 export default function MealPicker({ date, onClose }) {
   const { t, getName, language, recipes, tags, createMealPlan } = useApp()
@@ -33,14 +33,14 @@ export default function MealPicker({ date, onClose }) {
     recipe.recipe_tags?.map(rt => tags.find(tag => tag.id === rt.tag_id)).filter(Boolean) || []
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
         <div style={styles.header}>
           <div>
             <h2 style={styles.title}>{t('calendar.addMeal')}</h2>
             <p style={styles.date}>{formattedDate}</p>
           </div>
-          <button onClick={onClose} style={styles.closeButton}>✕</button>
+          <button onClick={onClose} style={styles.closeButton} aria-label="Retour">←</button>
         </div>
         <div style={styles.searchContainer}>
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
@@ -71,8 +71,8 @@ export default function MealPicker({ date, onClose }) {
 }
 
 const styles = {
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 },
-  modal: { backgroundColor: colors.white, borderTopLeftRadius: '20px', borderTopRightRadius: '20px', width: '100%', maxWidth: '500px', maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: shadows.lg },
+  overlay: { position: 'fixed', inset: 0, backgroundColor: colors.background, display: 'flex', justifyContent: 'center', zIndex: 1000 },
+  modal: { backgroundColor: colors.white, width: '100%', maxWidth: '600px', height: '100%', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}` },
   title: { fontFamily: fonts.heading, fontSize: fontSizes.lg, color: colors.forest, margin: 0, fontWeight: 700 },
   date: { fontSize: fontSizes.sm, color: colors.textSecondary, margin: 0, marginTop: '2px', textTransform: 'capitalize' },

@@ -15,7 +15,7 @@ const SECTION = {
 
 // Chaque section est une application à part entière ; seule la section « recettes » a des réglages
 // (ingrédients, catégories, étiquettes) et elle propose un accès direct aux deux autres.
-export default function Layout({ section = 'recipes', onHome, onOpenApp }) {
+export default function Layout({ section = 'recipes', onHome }) {
   const { language, toggleLanguage, signOut, currentTab, setCurrentTab, t } = useApp()
   const info = SECTION[section] ?? SECTION.recipes
   const inSettings = section === 'recipes' && currentTab === 'settings'
@@ -63,23 +63,6 @@ export default function Layout({ section = 'recipes', onHome, onOpenApp }) {
         </div>
       </main>
 
-      {onOpenApp && !inSettings && (
-        <nav style={styles.nav} aria-label={language === 'fr' ? 'Autres applications' : 'Other apps'}>
-          <div style={styles.navInner}>
-            {Object.entries(SECTION).map(([id, sec]) => {
-              const isActive = id === section
-              return (
-                <button key={id} onClick={() => !isActive && onOpenApp(id)} style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}>
-                  <span style={{ ...styles.icon, transform: isActive ? 'scale(1.15)' : 'scale(1)' }}>{sec.icon}</span>
-                  <span style={{ ...styles.label, color: isActive ? colors.forest : colors.textMuted, fontWeight: isActive ? 700 : 500 }}>
-                    {language === 'fr' ? sec.fr : sec.en}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </nav>
-      )}
     </div>
   )
 }
@@ -128,7 +111,7 @@ const styles = {
   actionBtnActive: {
     backgroundColor: colors.accentLight, borderColor: colors.accent
   },
-  main: { flex: 1, paddingBottom: '90px', overflowY: 'auto' },
+  main: { flex: 1 },
   nav: {
     position: 'fixed', bottom: 0,
     left: '50%', transform: 'translateX(-50%)',
