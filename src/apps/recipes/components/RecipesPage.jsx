@@ -6,6 +6,7 @@ import RecipeForm from './RecipeForm'
 import FilterPanel from './FilterPanel'
 import FullPage from './FullPage'
 import { priceFilter } from '../lib/price'
+import { sortRecipes } from '../lib/recipeSort'
 
 const EMPTY_FILTERS = {
   seasons: [], tags: [], bases: [], cuisines: [],
@@ -16,6 +17,7 @@ export default function RecipesPage() {
   const { t, recipes } = useApp()
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [sort, setSort] = useState('name')
   const [showForm, setShowForm] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState(null)
 
@@ -41,8 +43,8 @@ export default function RecipesPage() {
       if (price === 'too-expensive') return false
       return true
     })
-    return { filteredRecipes, hiddenNoPrice }
-  }, [recipes, searchQuery, filters])
+    return { filteredRecipes: sortRecipes(filteredRecipes, sort), hiddenNoPrice }
+  }, [recipes, searchQuery, filters, sort])
 
   const handleAddRecipe = () => { setEditingRecipe(null); setShowForm(true) }
   const handleEditRecipe = (recipe) => { setEditingRecipe(recipe); setShowForm(true) }
@@ -54,7 +56,7 @@ export default function RecipesPage() {
     <div style={styles.container}>
       {/* Search bar */}
       <div style={styles.searchBar}>
-        <span style={styles.searchIcon}>🔍</span>
+        <span style={styles.searchIcon} aria-hidden="true">⌕</span>
         <input
           type="text"
           value={searchQuery}
@@ -67,7 +69,7 @@ export default function RecipesPage() {
         )}
       </div>
 
-      <FilterPanel filters={filters} onChange={setFilters} />
+      <FilterPanel filters={filters} onChange={setFilters} sort={sort} onSort={setSort} />
 
       {(searchQuery || hasActiveFilters) && (
         <div style={styles.resultsCount}>

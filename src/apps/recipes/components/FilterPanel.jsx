@@ -1,171 +1,120 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, shadows, getSeasonColor } from '../lib/theme'
-import { SEASONS, DIFFICULTIES, MEAL_TYPES, getSeasonEmoji, getMealTypeEmoji } from '../lib/i18n'
+import { colors, fonts, fontSizes, borderRadius, shadows } from '../lib/theme'
+import { SEASONS, DIFFICULTIES, MEAL_TYPES } from '../lib/i18n'
 
-export default function FilterPanel({ filters, onChange }) {
-  const { t, getName, tags, bases, cuisines } = useApp()
-  const [isExpanded, setIsExpanded] = useState(false)
+const EMPTY = { seasons: [], tags: [], bases: [], cuisines: [], difficulties: [], mealTypes: [], maxPrice: '' }
 
-  const hasActiveFilters =
-    filters.seasons.length > 0 || filters.tags.length > 0 || filters.bases.length > 0 ||
-    filters.cuisines.length > 0 || filters.difficulties.length > 0 ||
-    filters.mealTypes.length > 0 || filters.maxPrice !== ''
+// Barre d'outils des recettes : types de plat en un tap, tri, et filtres avancés repliés (sans icônes).
+export default function FilterPanel({ filters, onChange, sort, onSort }) {
+  const { t, language, getName, tags, bases, cuisines } = useApp()
+  const fr = language === 'fr'
+  const [open, setOpen] = useState(false)
 
-  const activeCount = Object.values(filters).reduce((n, f) => n + (Array.isArray(f) ? f.length : f !== '' ? 1 : 0), 0)
+  // « Filtres » ne compte que ce qui se règle dans le panneau (le type de plat a ses propres boutons)
+  const advancedCount = filters.seasons.length + filters.tags.length + filters.bases.length + filters.cuisines.length
+    + filters.difficulties.length + (filters.maxPrice !== '' ? 1 : 0)
+  const anyActive = advancedCount > 0 || filters.mealTypes.length > 0
 
   const toggle = (key, value) => {
     const current = filters[key]
-    const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
-    onChange({ ...filters, [key]: next })
+    onChange({ ...filters, [key]: current.includes(value) ? current.filter(v => v !== value) : [...current, value] })
   }
+  const chip = (active) => ({ ...styles.chip, ...(active ? styles.chipOn : {}) })
 
-  const clearFilters = () => onChange({ seasons: [], tags: [], bases: [], cuisines: [], difficulties: [], mealTypes: [], maxPrice: '' })
+  const SORTS = [
+    ['name', fr ? 'Nom (A → Z)' : 'Name (A → Z)'],
+    ['recent', fr ? 'Ajoutées récemment' : 'Recently added'],
+    ['priceAsc', fr ? 'Prix croissant' : 'Price: low to high'],
+    ['priceDesc', fr ? 'Prix décroissant' : 'Price: high to low'],
+    ['time', fr ? 'Temps de préparation' : 'Prep time'],
+  ]
 
-  const chip = (active, activeColor) => ({
-    ...styles.chip,
-    backgroundColor: active ? activeColor + (activeColor.length === 7 ? '1A' : '') : colors.background,
-    color: active ? activeColor : colors.textSecondary,
-    borderColor: active ? activeColor + '40' : 'transparent'
-  })
+  const group = (label, key, items, labelOf) => items.length > 0 && (
+    <div style={styles.section}>
+      <span style={styles.sectionLabel}>{label}</span>
+      <div style={styles.chipGroup}>
+        {items.map(item => (
+          <button key={item.value} type="button" onClick={() => toggle(key, item.value)} style={chip(filters[key].includes(item.value))}>
+            {labelOf(item)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 
   return (
     <div style={styles.container}>
-      <button onClick={() => setIsExpanded(!isExpanded)} style={styles.toggleButton}>
-        <span style={styles.toggleText}>
-          ⚙️ {t('recipes.filters')}
-          {hasActiveFilters && <span style={styles.badge}>{activeCount}</span>}
-        </span>
-        <span style={{ ...styles.arrow, transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-      </button>
+      <div style={styles.types}>
+        <button type="button" onClick={() => onChange({ ...filters, mealTypes: [] })} style={chip(filters.mealTypes.length === 0)}>
+          {fr ? 'Tous' : 'All'}
+        </button>
+        {MEAL_TYPES.map(type => (
+          <button key={type} type="button" onClick={() => toggle('mealTypes', type)} style={chip(filters.mealTypes.includes(type))}>
+            {t(`mealType.${type}`)}
+          </button>
+        ))}
+      </div>
 
-      {isExpanded && (
+      <div style={styles.toolbar}>
+        <button type="button" onClick={() => setOpen(!open)} style={styles.filterBtn} aria-expanded={open}>
+          {t('recipes.filters')}{advancedCount > 0 && <span style={styles.badge}>{advancedCount}</span>}
+          <span style={{ ...styles.arrow, transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+        </button>
+        <label style={styles.sortWrap}>
+          <span style={styles.sortLabel}>{fr ? 'Trier' : 'Sort'}</span>
+          <select value={sort} onChange={e => onSort(e.target.value)} style={styles.sortSelect}>
+            {SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {open && (
         <div style={styles.panel}>
-          <div style={styles.section}>
-            <label style={styles.sectionLabel}>{t('recipe.mealType')}</label>
-            <div style={styles.chipGroup}>
-              {MEAL_TYPES.map(type => (
-                <button key={type} type="button" onClick={() => toggle('mealTypes', type)}
-                  style={chip(filters.mealTypes.includes(type), colors.terracotta)}>
-                  {getMealTypeEmoji(type)} {t(`mealType.${type}`)}
-                </button>
-              ))}
-            </div>
-          </div>
+          {group(t('recipe.seasons'), 'seasons', SEASONS.map(s => ({ value: s })), i => t(`season.${i.value}`))}
+          {group(t('recipe.tags'), 'tags', tags.map(x => ({ value: x.id, raw: x })), i => getName(i.raw))}
 
           <div style={styles.section}>
-            <label style={styles.sectionLabel}>{t('filter.maxPrice')}</label>
+            <span style={styles.sectionLabel}>{t('filter.maxPrice')}</span>
             <div style={styles.priceRow}>
-              <input
-                type="number" inputMode="decimal" min="0" step="1"
-                value={filters.maxPrice}
+              <input type="number" inputMode="decimal" min="0" step="1" value={filters.maxPrice}
                 onChange={e => onChange({ ...filters, maxPrice: e.target.value })}
-                placeholder={t('filter.maxPrice.placeholder')}
-                style={styles.priceInput}
-              />
+                placeholder={t('filter.maxPrice.placeholder')} style={styles.priceInput} />
               <span style={styles.priceUnit}>€</span>
             </div>
           </div>
 
-          <div style={styles.section}>
-            <label style={styles.sectionLabel}>{t('recipe.seasons')}</label>
-            <div style={styles.chipGroup}>
-              {SEASONS.map(season => (
-                <button key={season} type="button" onClick={() => toggle('seasons', season)}
-                  style={{ ...styles.chip, backgroundColor: filters.seasons.includes(season) ? getSeasonColor(season) + '1A' : colors.background, color: filters.seasons.includes(season) ? getSeasonColor(season) : colors.textSecondary, borderColor: filters.seasons.includes(season) ? getSeasonColor(season) + '40' : 'transparent' }}>
-                  {getSeasonEmoji(season)} {t(`season.${season}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {tags.length > 0 && (
-            <div style={styles.section}>
-              <label style={styles.sectionLabel}>{t('recipe.tags')}</label>
-              <div style={styles.chipGroup}>
-                {tags.map(tag => (
-                  <button key={tag.id} type="button" onClick={() => toggle('tags', tag.id)}
-                    style={chip(filters.tags.includes(tag.id), colors.forest)}>
-                    {tag.icon} {getName(tag)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {bases.length > 0 && (
-            <div style={styles.section}>
-              <label style={styles.sectionLabel}>{t('recipe.base')}</label>
-              <div style={styles.chipGroup}>
-                {bases.map(base => (
-                  <button key={base.id} type="button" onClick={() => toggle('bases', base.id)}
-                    style={chip(filters.bases.includes(base.id), colors.terracotta)}>
-                    {getName(base)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {cuisines.length > 0 && (
-            <div style={styles.section}>
-              <label style={styles.sectionLabel}>{t('recipe.cuisine')}</label>
-              <div style={styles.chipGroup}>
-                {cuisines.map(cuisine => (
-                  <button key={cuisine.id} type="button" onClick={() => toggle('cuisines', cuisine.id)}
-                    style={chip(filters.cuisines.includes(cuisine.id), colors.gold)}>
-                    {cuisine.flag} {getName(cuisine)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={styles.section}>
-            <label style={styles.sectionLabel}>{t('recipe.difficulty')}</label>
-            <div style={styles.chipGroup}>
-              {DIFFICULTIES.map(diff => (
-                <button key={diff} type="button" onClick={() => toggle('difficulties', diff)}
-                  style={chip(filters.difficulties.includes(diff), colors.forest)}>
-                  {t(`difficulty.${diff}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {hasActiveFilters && (
-            <button onClick={clearFilters} style={styles.clearButton}>
-              ✕ {t('recipes.clearFilters')}
-            </button>
-          )}
+          {group(t('recipe.base'), 'bases', bases.map(x => ({ value: x.id, raw: x })), i => getName(i.raw))}
+          {group(t('recipe.cuisine'), 'cuisines', cuisines.map(x => ({ value: x.id, raw: x })), i => getName(i.raw))}
+          {group(t('recipe.difficulty'), 'difficulties', DIFFICULTIES.map(d => ({ value: d })), i => t(`difficulty.${i.value}`))}
         </div>
+      )}
+
+      {anyActive && (
+        <button type="button" onClick={() => onChange(EMPTY)} style={styles.clearButton}>✕ {t('recipes.clearFilters')}</button>
       )}
     </div>
   )
 }
 
 const styles = {
+  container: { marginBottom: '12px' },
+  types: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px', margin: '0 -16px 10px', padding: '0 16px 2px' },
+  chip: { flexShrink: 0, padding: '8px 14px', borderRadius: borderRadius.full, border: '1.5px solid transparent', backgroundColor: 'white', color: colors.textSecondary, fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', fontWeight: 600, boxShadow: shadows.sm },
+  chipOn: { backgroundColor: colors.forest, color: 'white' },
+  toolbar: { display: 'flex', gap: '8px' },
+  filterBtn: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', backgroundColor: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '12px', boxShadow: shadows.sm, cursor: 'pointer', fontFamily: fonts.body, fontSize: '14px', color: colors.textSecondary, fontWeight: 600 },
+  badge: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.forest, color: 'white', fontSize: '11px', fontWeight: 700, minWidth: '20px', height: '20px', borderRadius: '10px', padding: '0 5px' },
+  arrow: { fontSize: '12px', color: colors.textMuted, transition: 'transform .2s ease' },
+  sortWrap: { flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', backgroundColor: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '12px', boxShadow: shadows.sm, minWidth: 0 },
+  sortLabel: { fontSize: '13px', color: colors.textMuted },
+  sortSelect: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: '14px', fontWeight: 600, color: colors.textPrimary, fontFamily: fonts.body, padding: '10px 0' },
+  panel: { marginTop: '8px', padding: '16px', backgroundColor: 'white', borderRadius: '14px', boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)' },
+  section: { marginBottom: '14px' },
+  sectionLabel: { display: 'block', fontSize: '11px', fontWeight: 700, color: colors.textMuted, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.6px' },
+  chipGroup: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
   priceRow: { display: 'flex', alignItems: 'center', gap: '8px' },
   priceInput: { width: '110px', padding: '8px 12px', fontSize: fontSizes.md, border: `1.5px solid ${colors.warmGray}`, borderRadius: borderRadius.md, backgroundColor: colors.white, color: colors.textPrimary, outline: 'none', fontFamily: fonts.body },
   priceUnit: { fontSize: fontSizes.md, fontWeight: 600, color: colors.textSecondary },
-  container: { marginBottom: '12px' },
-  toggleButton: {
-    width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '12px 16px', backgroundColor: 'white', border: '1px solid rgba(0,0,0,0.04)',
-    borderRadius: '14px', boxShadow: shadows.sm, cursor: 'pointer', fontFamily: fonts.body,
-    fontSize: '14px', color: colors.textSecondary, transition: 'all 0.2s ease'
-  },
-  toggleText: { display: 'flex', alignItems: 'center', gap: '8px' },
-  badge: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.forest, color: 'white', fontSize: '10px', fontWeight: '700',
-    width: '20px', height: '20px', borderRadius: '10px'
-  },
-  arrow: { fontSize: '10px', color: colors.textMuted, transition: 'transform 0.25s ease' },
-  panel: { marginTop: '8px', padding: '18px', backgroundColor: 'white', borderRadius: '14px', boxShadow: shadows.sm, border: '1px solid rgba(0,0,0,0.04)' },
-  section: { marginBottom: '16px' },
-  sectionLabel: { display: 'block', fontSize: '11px', fontWeight: 700, color: colors.textMuted, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.6px' },
-  chipGroup: { display: 'flex', flexWrap: 'wrap', gap: '6px' },
-  chip: { padding: '6px 12px', borderRadius: borderRadius.full, border: '1.5px solid transparent', fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', transition: 'all 0.2s ease', fontWeight: 500 },
-  clearButton: { width: '100%', padding: '10px', backgroundColor: colors.background, border: 'none', borderRadius: '12px', color: colors.textSecondary, fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', marginTop: '4px', fontWeight: 500, transition: 'all 0.2s ease' }
+  clearButton: { width: '100%', padding: '10px', backgroundColor: colors.background, border: 'none', borderRadius: '12px', color: colors.textSecondary, fontSize: '13px', fontFamily: fonts.body, cursor: 'pointer', marginTop: '8px', fontWeight: 500 },
 }

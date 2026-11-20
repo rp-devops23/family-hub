@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import { colors, fonts, fontSizes, spacing, borderRadius, commonStyles, getSeasonColor } from '../lib/theme'
-import { SEASONS, DIFFICULTIES, MEAL_TYPES, getSeasonEmoji, getMealTypeEmoji } from '../lib/i18n'
+import { SEASONS, DIFFICULTIES, MEAL_TYPES } from '../lib/i18n'
 import { recipePrice, formatEuro } from '../lib/price'
 import IngredientSelector from './IngredientSelector'
 
@@ -157,7 +157,7 @@ export default function RecipeForm({ recipe, onClose }) {
                     borderColor: mealType === type ? colors.terracotta + '40' : 'transparent'
                   }}
                 >
-                  {getMealTypeEmoji(type)} {t(`mealType.${type}`)}
+                  {t(`mealType.${type}`)}
                 </button>
               ))}
             </div>
@@ -178,7 +178,7 @@ export default function RecipeForm({ recipe, onClose }) {
                     borderColor: seasons.includes(season) ? getSeasonColor(season) + '40' : 'transparent'
                   }}
                 >
-                  {getSeasonEmoji(season)} {t(`season.${season}`)}
+                  {t(`season.${season}`)}
                 </button>
               ))}
             </div>
@@ -199,7 +199,7 @@ export default function RecipeForm({ recipe, onClose }) {
                     borderColor: selectedTags.includes(tag.id) ? colors.forest + '40' : 'transparent'
                   }}
                 >
-                  {tag.icon} {getName(tag)}
+                  {getName(tag)}
                 </button>
               ))}
             </div>
@@ -220,7 +220,7 @@ export default function RecipeForm({ recipe, onClose }) {
             <select value={cuisineId} onChange={(e) => setCuisineId(e.target.value)} style={styles.select}>
               <option value="">{t('recipe.cuisine.none')}</option>
               {cuisines.map(cuisine => (
-                <option key={cuisine.id} value={cuisine.id}>{cuisine.flag} {getName(cuisine)}</option>
+                <option key={cuisine.id} value={cuisine.id}>{getName(cuisine)}</option>
               ))}
             </select>
           </div>
