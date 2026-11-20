@@ -214,6 +214,12 @@ export function RecipeProvider({ children, initialTab }) {
     setRecipes(allRecipes)
   }, [user])
 
+  // Relit les recettes (et donc leur coût calculé), par exemple après une modification de prix d'ingrédient
+  const refreshRecipes = useCallback(async () => {
+    if (!user) return
+    setRecipes(await getRecipes(user.id))
+  }, [user])
+
   const deleteRecipe = useCallback(async (recipeId) => {
     await apiDeleteRecipe(recipeId)
     setRecipes(prev => prev.filter(r => r.id !== recipeId))
@@ -314,7 +320,7 @@ export function RecipeProvider({ children, initialTab }) {
     createIngredient, updateIngredient, deleteIngredient,
 
     // Recipe actions
-    createRecipe, updateRecipe, deleteRecipe,
+    createRecipe, updateRecipe, deleteRecipe, refreshRecipes,
 
     // Meal plan actions
     loadMealPlans, createMealPlan, deleteMealPlan,
@@ -330,7 +336,7 @@ export function RecipeProvider({ children, initialTab }) {
     createBase, updateBase, deleteBase,
     createIngredientCategory, updateIngredientCategory, deleteIngredientCategory, reorderIngredientCategories,
     createIngredient, updateIngredient, deleteIngredient,
-    createRecipe, updateRecipe, deleteRecipe,
+    createRecipe, updateRecipe, deleteRecipe, refreshRecipes,
     loadMealPlans, createMealPlan, deleteMealPlan,
     createShoppingItem, createShoppingItems, updateShoppingItem,
     deleteShoppingItem, deleteCheckedShoppingItems, deleteAllShoppingItems,
