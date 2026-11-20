@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles, getSeasonColor } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, borderRadius, commonStyles, getSeasonColor } from '../lib/theme'
 import { SEASONS, DIFFICULTIES, MEAL_TYPES, getSeasonEmoji, getMealTypeEmoji } from '../lib/i18n'
 import { recipePrice, formatEuro } from '../lib/price'
 import IngredientSelector from './IngredientSelector'
@@ -113,13 +113,13 @@ export default function RecipeForm({ recipe, onClose }) {
   }
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
         <div style={styles.header}>
           <h2 style={styles.title}>
             {isEditing ? t('recipe.edit') : t('recipe.new')}
           </h2>
-          <button onClick={onClose} style={styles.closeButton}>✕</button>
+          <button onClick={onClose} style={styles.closeButton} aria-label="Retour">←</button>
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -331,9 +331,9 @@ export default function RecipeForm({ recipe, onClose }) {
 }
 
 const styles = {
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: spacing.md, paddingTop: spacing.xl, zIndex: 1000, overflowY: 'auto' },
-  modal: { backgroundColor: colors.white, borderRadius: borderRadius.xl, width: '100%', maxWidth: '500px', maxHeight: 'calc(100vh - 100px)', overflowY: 'auto', boxShadow: shadows.lg },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}`, position: 'sticky', top: 0, backgroundColor: colors.white, zIndex: 1, borderRadius: `${borderRadius.xl} ${borderRadius.xl} 0 0` },
+  overlay: { position: 'fixed', inset: 0, backgroundColor: colors.background, display: 'flex', justifyContent: 'center', zIndex: 1000, overflowY: 'auto' },
+  modal: { backgroundColor: colors.white, width: '100%', maxWidth: '600px', minHeight: '100%', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}`, position: 'sticky', top: 0, backgroundColor: colors.white, zIndex: 1 },
   title: { fontFamily: fonts.heading, fontSize: fontSizes.xl, color: colors.forest, margin: 0, fontWeight: 700 },
   closeButton: { width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', backgroundColor: colors.background, borderRadius: '10px', cursor: 'pointer', fontSize: fontSizes.md, color: colors.textSecondary, transition: 'all 0.2s ease' },
   form: { padding: '20px', display: 'flex', flexDirection: 'column', gap: spacing.md },

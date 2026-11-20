@@ -88,7 +88,7 @@ function AppInner() {
 
   if (activeApp === 'recipes' || activeApp === 'calendar' || activeApp === 'groceries') {
     // Trois applications distinctes qui partagent la même couche de données (RecipeProvider)
-    return <RecipeApp key={activeApp} section={activeApp} onHome={goHome} onOpenApp={openApp} initialTab={route.tab} />;
+    return <RecipeApp key={activeApp} section={activeApp} onHome={goHome} initialTab={route.tab} />;
   }
 
   if (activeApp === 'agent') {
