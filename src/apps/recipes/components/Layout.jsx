@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useApp } from '../context/RecipeContext'
 import RecipesPage from './RecipesPage'
 import CalendarPage from './CalendarPage'
 import ShoppingListPage from './ShoppingListPage'
 import SettingsPage from './SettingsPage'
+import PricesPage from './PricesPage'
 import { colors, primaryRgb } from '../lib/theme'
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -19,9 +21,12 @@ export default function Layout({ section = 'recipes', onHome }) {
   const { language, toggleLanguage, signOut, currentTab, setCurrentTab, t } = useApp()
   const info = SECTION[section] ?? SECTION.recipes
   const inSettings = section === 'recipes' && currentTab === 'settings'
+  const [showPrices, setShowPrices] = useState(false)
+  const inPrices = section === 'recipes' && showPrices && !inSettings
 
   const renderPage = () => {
     if (inSettings) return <SettingsPage onHome={onHome} />
+    if (inPrices) return <PricesPage />
     switch (info.tab) {
       case 'calendar': return <CalendarPage />
       case 'shopping': return <ShoppingListPage />
@@ -39,13 +44,18 @@ export default function Layout({ section = 'recipes', onHome }) {
             </button>
           )}
           <span style={{ fontSize: '21px' }}>{info.icon}</span>
-          <span style={styles.logoText}>{language === 'fr' ? info.fr : info.en}</span>
+          <span style={styles.logoText}>{inPrices ? (language === 'fr' ? 'Prix' : 'Prices') : (language === 'fr' ? info.fr : info.en)}</span>
         </div>
 
         <div style={styles.actions}>
           <button onClick={toggleLanguage} style={styles.langBtn}>
             {language === 'fr' ? 'EN' : 'FR'}
           </button>
+          {section === 'recipes' && (
+            <button onClick={() => { setShowPrices(v => !v); if (currentTab === 'settings') setCurrentTab('recipes') }} style={{ ...styles.actionBtn, ...(inPrices ? styles.actionBtnActive : {}) }} title={language === 'fr' ? 'Prix des ingrédients' : 'Ingredient prices'} aria-label={language === 'fr' ? 'Prix des ingrédients' : 'Ingredient prices'}>
+              💶
+            </button>
+          )}
           {section === 'recipes' && (
             <button onClick={() => setCurrentTab(inSettings ? 'recipes' : 'settings')} style={{ ...styles.actionBtn, ...(inSettings ? styles.actionBtnActive : {}) }} title={t('nav.settings')}>
               ⚙️
