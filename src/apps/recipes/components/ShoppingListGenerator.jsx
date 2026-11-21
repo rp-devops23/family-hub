@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/RecipeContext'
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns'
+import { format, addDays, eachDayOfInterval, isSameDay, startOfDay } from 'date-fns'
 import { fr, enUS } from 'date-fns/locale'
-import { colors, fonts, fontSizes, spacing, borderRadius, shadows, commonStyles } from '../lib/theme'
+import { colors, fonts, fontSizes, spacing, borderRadius, commonStyles } from '../lib/theme'
+import FullPage from './FullPage'
 
 // Helper: Normalize unit (treat null, undefined, "" as the same)
 function normalizeUnit(unit) {
@@ -112,32 +113,30 @@ function aggregateQuantities(quantities, units) {
 
 export default function ShoppingListGenerator({ onClose, onGenerated }) {
   const {
-    t, getName, language,
+    t, language,
     mealPlans, loadMealPlans,
     shoppingItems,
     createShoppingItem, updateShoppingItem,
     recipes
   } = useApp()
 
-  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
+  // Les jours à venir à la suite (aujourd'hui compris, pas le passé) ; on peut en charger 30 de plus
+  const [horizon, setHorizon] = useState(30)
   const [selectedDates, setSelectedDates] = useState([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
 
   const locale = language === 'fr' ? fr : enUS
 
-  const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 })
-  const days = eachDayOfInterval({ start: currentWeekStart, end: weekEnd })
+  const firstDay = startOfDay(new Date())
+  const lastDay = addDays(firstDay, horizon - 1)
+  const days = eachDayOfInterval({ start: firstDay, end: lastDay })
+  const firstStr = format(firstDay, 'yyyy-MM-dd')
+  const lastStr = format(lastDay, 'yyyy-MM-dd')
 
   useEffect(() => {
-    const startStr = format(currentWeekStart, 'yyyy-MM-dd')
-    const endStr = format(weekEnd, 'yyyy-MM-dd')
-    loadMealPlans(startStr, endStr)
-  }, [currentWeekStart])
-
-  const goToPreviousWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1))
-  const goToNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1))
-  const goToCurrentWeek = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))
+    loadMealPlans(firstStr, lastStr)
+  }, [firstStr, lastStr, loadMealPlans])
 
   const getMealsForDay = (day) => {
     const dayStr = format(day, 'yyyy-MM-dd')
@@ -151,8 +150,9 @@ export default function ShoppingListGenerator({ onClose, onGenerated }) {
     )
   }
 
-  const selectAllWithMeals = () => {
+  const selectDaysWithMeals = (count) => {
     const daysWithMeals = days
+      .slice(0, count)
       .filter(day => getMealsForDay(day).length > 0)
       .map(day => format(day, 'yyyy-MM-dd'))
     setSelectedDates(daysWithMeals)
@@ -262,36 +262,23 @@ export default function ShoppingListGenerator({ onClose, onGenerated }) {
     }
   }
 
-  const weekRangeText = `${format(currentWeekStart, 'd MMM', { locale })} - ${format(weekEnd, 'd MMM yyyy', { locale })}`
-  const isCurrentWeek = isSameDay(currentWeekStart, startOfWeek(new Date(), { weekStartsOn: 1 }))
-
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+    <FullPage><div style={styles.overlay}>
+      <div style={styles.modal}>
         <div style={styles.header}>
           <div>
             <h2 style={styles.title}>{t('shopping.selectDays')}</h2>
             <p style={styles.subtitle}>{t('shopping.selectDaysDesc')}</p>
           </div>
-          <button onClick={onClose} style={styles.closeButton}>✕</button>
-        </div>
-
-        <div style={styles.weekNav}>
-          <button onClick={goToPreviousWeek} style={styles.weekNavButton}>←</button>
-          <div style={styles.weekNavCenter}>
-            <span style={styles.weekNavText}>{weekRangeText}</span>
-            {!isCurrentWeek && (
-              <button onClick={goToCurrentWeek} style={styles.todayButton}>
-                {t('calendar.today')}
-              </button>
-            )}
-          </div>
-          <button onClick={goToNextWeek} style={styles.weekNavButton}>→</button>
+          <button onClick={onClose} style={styles.closeButton} aria-label="Retour">←</button>
         </div>
 
         <div style={styles.quickActions}>
-          <button onClick={selectAllWithMeals} style={styles.quickButton}>
-            ✓ {language === 'fr' ? 'Tout sélectionner' : 'Select all'}
+          <button onClick={() => selectDaysWithMeals(7)} style={styles.quickButton}>
+            {language === 'fr' ? '7 prochains jours' : 'Next 7 days'}
+          </button>
+          <button onClick={() => selectDaysWithMeals(horizon)} style={styles.quickButton}>
+            {language === 'fr' ? 'Tout sélectionner' : 'Select all'}
           </button>
           {selectedDates.length > 0 && (
             <button onClick={clearSelection} style={styles.quickButtonClear}>
@@ -325,9 +312,9 @@ export default function ShoppingListGenerator({ onClose, onGenerated }) {
                 <div style={styles.dayHeader}>
                   <div style={styles.dayInfo}>
                     <span style={{ ...styles.dayName, color: isToday ? colors.forest : colors.textPrimary }}>
-                      {format(day, 'EEEE', { locale })}
+                      {isToday ? (language === 'fr' ? "Aujourd'hui" : 'Today') : format(day, 'EEEE', { locale })}
                     </span>
-                    <span style={styles.dayDate}>{format(day, 'd MMMM', { locale })}</span>
+                    <span style={styles.dayDate}>{isToday ? format(day, 'EEEE d MMMM', { locale }) : format(day, 'd MMMM', { locale })}</span>
                   </div>
                   {hasMeals && (
                     <div style={{
@@ -361,6 +348,9 @@ export default function ShoppingListGenerator({ onClose, onGenerated }) {
               </button>
             )
           })}
+          <button onClick={() => setHorizon(h => h + 30)} style={styles.moreButton}>
+            {language === 'fr' ? '+ 30 jours de plus' : '+ 30 more days'}
+          </button>
         </div>
 
         <div style={styles.footer}>
@@ -376,13 +366,13 @@ export default function ShoppingListGenerator({ onClose, onGenerated }) {
           </button>
         </div>
       </div>
-    </div>
+    </div></FullPage>
   )
 }
 
 const styles = {
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: spacing.md, zIndex: 1000 },
-  modal: { backgroundColor: colors.white, borderRadius: '20px', width: '100%', maxWidth: '450px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: shadows.lg },
+  overlay: { position: 'fixed', inset: 0, backgroundColor: colors.background, display: 'flex', justifyContent: 'center', zIndex: 1000 },
+  modal: { backgroundColor: colors.white, width: '100%', maxWidth: '600px', height: '100%', display: 'flex', flexDirection: 'column' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '16px 20px', borderBottom: `1px solid ${colors.warmGray}` },
   title: { fontFamily: fonts.heading, fontSize: fontSizes.xl, color: colors.forest, margin: 0, fontWeight: 700 },
   subtitle: { fontSize: fontSizes.sm, color: colors.textMuted, margin: 0, marginTop: '4px' },
@@ -393,6 +383,7 @@ const styles = {
   weekNavText: { fontSize: fontSizes.sm, fontWeight: 700, color: colors.textPrimary, textTransform: 'capitalize' },
   todayButton: { padding: '3px 10px', backgroundColor: colors.forest, color: colors.white, border: 'none', borderRadius: borderRadius.full, fontSize: fontSizes.xs, cursor: 'pointer', fontFamily: fonts.body, fontWeight: 600 },
   quickActions: { display: 'flex', gap: spacing.sm, padding: '10px 16px', borderBottom: `1px solid ${colors.warmGray}` },
+  moreButton: { padding: '12px', backgroundColor: colors.background, color: colors.textSecondary, border: 'none', borderRadius: '12px', fontSize: fontSizes.sm, fontWeight: 600, cursor: 'pointer', fontFamily: fonts.body, marginTop: '4px' },
   quickButton: { flex: 1, padding: '6px', backgroundColor: colors.forest + '12', color: colors.forest, border: 'none', borderRadius: '10px', fontSize: fontSizes.xs, fontWeight: 600, cursor: 'pointer', fontFamily: fonts.body, transition: 'all 0.2s ease' },
   quickButtonClear: { padding: '6px 12px', backgroundColor: 'transparent', color: colors.textMuted, border: `1.5px solid ${colors.warmGray}`, borderRadius: '10px', fontSize: fontSizes.xs, cursor: 'pointer', fontFamily: fonts.body, transition: 'all 0.2s ease' },
   error: { margin: '10px 16px', padding: '10px 14px', backgroundColor: colors.errorLight, color: colors.error, borderRadius: '12px', fontSize: fontSizes.sm, textAlign: 'center' },
